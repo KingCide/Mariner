@@ -7,10 +7,15 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+.yarn
+.pnp.*
+
+# Build output
 dist
 dist-electron
-dist-ssr
+release
 *.local
 
 # Editor directories and files
@@ -26,5 +31,16 @@ dist-ssr
 
 # Environment variables
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage
+
+# Temporary files
+.temp
+.tmp
+.cache

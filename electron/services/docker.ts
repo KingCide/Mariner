@@ -207,4 +207,12 @@ export class DockerService {
       })
     })
   }
+
+  public cleanup(): void {
+    // 断开所有 Docker 连接
+    for (const [hostId, docker] of this.connections.entries()) {
+      this.disconnect(hostId)
+    }
+    this.connections.clear()
+  }
 } 

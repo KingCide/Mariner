@@ -1,43 +1,55 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.kingcide.mariner",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "Mariner",
+  "copyright": "Copyright © 2024 Kingcide",
   "directories": {
-    "output": "release/${version}"
+    "output": "release"
   },
   "files": [
     "dist",
     "dist-electron"
   ],
   "mac": {
+    "category": "public.app-category.developer-tools",
     "target": [
-      "dmg"
+      "dmg",
+      "zip"
     ],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+    "icon": "build/icon.icns"
   },
   "win": {
     "target": [
-      {
-        "target": "nsis",
-        "arch": [
-          "x64"
-        ]
-      }
+      "nsis",
+      "portable"
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    "icon": "build/icon.ico"
   },
   "nsis": {
     "oneClick": false,
-    "perMachine": false,
     "allowToChangeInstallationDirectory": true,
-    "deleteAppDataOnUninstall": false
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Mariner",
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico"
   },
   "linux": {
     "target": [
-      "AppImage"
+      "AppImage",
+      "deb",
+      "rpm"
     ],
-    "artifactName": "${productName}-Linux-${version}.${ext}"
+    "category": "Development",
+    "icon": "build/icon.png"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "kingcide",
+    "repo": "mariner",
+    "private": false,
+    "releaseType": "release"
   }
 }

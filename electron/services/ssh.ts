@@ -118,4 +118,12 @@ export class SSHService {
       })
     })
   }
+
+  public cleanup(): void {
+    // 关闭所有 SSH 连接
+    for (const client of this.tunnels.values()) {
+      client.client.end()
+    }
+    this.tunnels.clear()
+  }
 } 

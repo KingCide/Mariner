@@ -1,70 +1,59 @@
 import { defineConfig } from 'vite'
-import path from 'node:path'
-import electron from 'vite-plugin-electron/simple'
 import vue from '@vitejs/plugin-vue'
+import electron from 'vite-plugin-electron'
+import renderer from 'vite-plugin-electron-renderer'
+import { resolve } from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
-    electron({
-      main: {
+    electron([
+      {
+        // 主进程入口文件
         entry: 'electron/main.ts',
         vite: {
           build: {
             outDir: 'dist-electron',
-            sourcemap: true,
-            minify: false,
             rollupOptions: {
-              external: [
-                'electron',
-                'electron/main',
-                'electron/common',
-                'electron/renderer',
-                'dockerode',
-                'ssh2',
-                'net',
-                'fs',
-                'path',
-                'crypto',
-                'os',
-                'child_process'
-              ]
-            }
-          },
-          resolve: {
-            alias: {
-              '@': path.resolve(__dirname, 'src'),
-              '@electron': path.resolve(__dirname, 'electron')
+              external: ['electron'],
+              output: {
+                format: 'cjs'
+              }
             }
           }
         }
       },
-      preload: {
-        input: path.join(__dirname, 'electron/preload.ts'),
+      {
+        // 预加载脚本
+        entry: 'electron/preload.ts',
+        onstart(options) {
+          options.reload()
+        },
         vite: {
           build: {
-            outDir: 'dist-electron/preload',
-            sourcemap: true,
-            minify: false,
+            outDir: 'dist-electron',
             rollupOptions: {
-              external: [
-                'electron',
-                'electron/main',
-                'electron/common',
-                'electron/renderer'
-              ]
+              output: {
+                format: 'cjs'
+              }
             }
           }
         }
-      },
-      renderer: {}
-    })
+      }
+    ]),
+    renderer()
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
-      '@electron': path.resolve(__dirname, 'electron')
+      '@': resolve(__dirname, 'src')
     }
+  },
+  build: {
+    emptyOutDir: true,
+    outDir: 'dist'
+  },
+  server: {
+    port: 5173
   }
 })
