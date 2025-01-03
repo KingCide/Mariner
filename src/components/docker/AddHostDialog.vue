@@ -8,7 +8,7 @@
   >
     <el-tabs v-model="activeTab">
       <el-tab-pane label="SSH连接" name="ssh">
-        <ssh-config-form @saved="handleSaved" />
+        <SSHConfigForm @saved="handleSaved" />
       </el-tab-pane>
       <el-tab-pane label="TCP连接" name="tcp">
         <!-- TODO: 实现TCP连接配置表单 -->

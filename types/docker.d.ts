@@ -10,8 +10,9 @@ export interface DockerHost {
     certPath?: string
     sshConfig?: {
       username: string
-      privateKey: string
+      privateKey?: string
       passphrase?: string
+      password?: string
     }
   }
 }

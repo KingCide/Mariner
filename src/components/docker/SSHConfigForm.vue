@@ -173,8 +173,15 @@ const handleTest = async () => {
         port: form.port,
         sshConfig: {
           username: form.username,
-          privateKey: form.privateKey,
-          passphrase: form.passphrase
+          ...(form.authType === 'privateKey' 
+            ? {
+                privateKey: form.privateKey,
+                passphrase: form.passphrase
+              }
+            : {
+                password: form.password
+              }
+          )
         }
       }
     }
@@ -201,8 +208,15 @@ const handleSubmit = async () => {
         port: form.port,
         sshConfig: {
           username: form.username,
-          privateKey: form.privateKey,
-          passphrase: form.passphrase
+          ...(form.authType === 'privateKey' 
+            ? {
+                privateKey: form.privateKey,
+                passphrase: form.passphrase
+              }
+            : {
+                password: form.password
+              }
+          )
         }
       }
     }

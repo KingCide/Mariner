@@ -29,6 +29,10 @@ export class IpcService {
       return this.dockerService.disconnect(hostId)
     })
 
+    ipcMain.handle('docker:getHostStats', async (_: IpcMainInvokeEvent, hostId: string) => {
+      return this.dockerService.getHostStats(hostId)
+    })
+
     // SSH连接测试
     ipcMain.handle('docker:testSSH', async (_: IpcMainInvokeEvent, host: any) => {
       return this.dockerService.testSSHConnection(host)

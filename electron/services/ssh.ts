@@ -12,6 +12,7 @@ interface TunnelConfig {
   dstPort: number
   localHost: string
   localPort: number
+  password?: string
 }
 
 export class SSHService {
@@ -77,8 +78,13 @@ export class SSHService {
         host: config.host,
         port: config.port || 22,
         username: config.username,
-        privateKey: config.privateKey,
-        passphrase: config.passphrase,
+        ...(config.password 
+          ? { password: config.password }
+          : {
+              privateKey: config.privateKey,
+              passphrase: config.passphrase
+            }
+        ),
         readyTimeout: 30000,
         keepaliveInterval: 30000,
         keepaliveCountMax: 3
@@ -95,7 +101,7 @@ export class SSHService {
     }
   }
 
-  async testConnection(config: Pick<TunnelConfig, 'host' | 'port' | 'username' | 'privateKey' | 'passphrase'>): Promise<boolean> {
+  async testConnection(config: Pick<TunnelConfig, 'host' | 'port' | 'username' | 'privateKey' | 'passphrase' | 'password'>): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const client = new Client()
 
@@ -112,8 +118,13 @@ export class SSHService {
         host: config.host,
         port: config.port || 22,
         username: config.username,
-        privateKey: config.privateKey,
-        passphrase: config.passphrase,
+        ...(config.password 
+          ? { password: config.password }
+          : {
+              privateKey: config.privateKey,
+              passphrase: config.passphrase
+            }
+        ),
         readyTimeout: 30000
       })
     })
