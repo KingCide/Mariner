@@ -2,7 +2,7 @@
   <div class="host-list">
     <el-row :gutter="16">
       <el-col v-for="host in hosts" :key="host.id" :span="8">
-        <el-card class="host-card" :class="{ active: host.id === activeHostId }" @dblclick="handleHostClick(host)">
+        <el-card class="host-card" :class="{ active: host.id === selectedHostId }" @dblclick="handleHostClick(host)">
           <template #header>
             <div class="card-header">
               <el-tag
@@ -33,40 +33,42 @@
           <div class="host-info">
             <div class="info-item">
               <span class="label">地址：</span>
-              <span class="value">{{ host.config.host }}:{{ host.config.port }}</span>
+              <span class="value">
+                {{ host.connectionType === 'local' ? '本地' : `${host.config.host}:${host.config.port}` }}
+              </span>
             </div>
             <div class="info-item">
               <span class="label">类型：</span>
               <span class="value">{{ getConnectionType(host.connectionType) }}</span>
             </div>
-            <template v-if="host.status === 'connected'">
+            <template v-if="host.status === 'connected' && host.info">
+              <div class="info-item">
+                <span class="label">版本：</span>
+                <span class="value">{{ host.info.version }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">系统：</span>
+                <span class="value">{{ host.info.os }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">内核：</span>
+                <span class="value">{{ host.info.kernelVersion }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">CPU：</span>
+                <span class="value">{{ host.info.cpus }} 核</span>
+              </div>
+              <div class="info-item">
+                <span class="label">内存：</span>
+                <span class="value">{{ formatBytes(host.info.memory) }}</span>
+              </div>
               <div class="info-item">
                 <span class="label">容器数：</span>
-                <span class="value">{{ hostStats[host.id]?.containers || 0 }}</span>
+                <span class="value">{{ host.info.containers }}</span>
               </div>
               <div class="info-item">
                 <span class="label">镜像数：</span>
-                <span class="value">{{ hostStats[host.id]?.images || 0 }}</span>
-              </div>
-              <div class="resource-usage">
-                <div class="usage-item">
-                  <span class="label">CPU</span>
-                  <el-progress
-                    :percentage="hostStats[host.id]?.cpu || 0"
-                    :stroke-width="4"
-                    :show-text="false"
-                  />
-                  <span class="value">{{ hostStats[host.id]?.cpu || 0 }}%</span>
-                </div>
-                <div class="usage-item">
-                  <span class="label">内存</span>
-                  <el-progress
-                    :percentage="hostStats[host.id]?.memory || 0"
-                    :stroke-width="4"
-                    :show-text="false"
-                  />
-                  <span class="value">{{ hostStats[host.id]?.memory || 0 }}%</span>
-                </div>
+                <span class="value">{{ host.info.images }}</span>
               </div>
             </template>
           </div>
@@ -93,10 +95,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { More, Plus } from '@element-plus/icons-vue'
 import { useDockerStore } from '../../stores/dockerStore'
+import { formatBytes } from '../../utils/format'
 import AddHostDialog from './AddHostDialog.vue'
 import type { DockerHost } from '../../../types/docker'
 import { useRouter } from 'vue-router'
@@ -107,42 +110,14 @@ const editingHost = ref<DockerHost | null>(null)
 const router = useRouter()
 
 const hosts = computed(() => dockerStore.hosts)
-const activeHostId = computed(() => dockerStore.activeHostId)
-const hostStats = computed(() => dockerStore.hostStats)
-
-// 自动刷新
-let refreshInterval: ReturnType<typeof setInterval> | null = null
-
-onMounted(() => {
-  // 初始刷新
-  hosts.value.forEach(host => refreshHostStats(host))
-  // 每30秒刷新一次
-  refreshInterval = setInterval(() => {
-    hosts.value.forEach(host => refreshHostStats(host))
-  }, 30000)
-})
-
-onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
-})
-
-const refreshHostStats = async (host: DockerHost) => {
-  if (host.status === 'connected') {
-    try {
-      await dockerStore.refreshContainers(host.id)
-      await dockerStore.refreshImages(host.id)
-    } catch (error) {
-      console.error(`Failed to refresh stats for host ${host.id}:`, error)
-    }
-  }
-}
+const selectedHostId = computed(() => dockerStore.selectedHostId)
 
 const getStatusType = (status: string) => {
   switch (status) {
     case 'connected':
       return 'success'
+    case 'connecting':
+      return 'warning'
     case 'disconnected':
       return 'info'
     case 'error':
@@ -166,32 +141,38 @@ const getConnectionType = (type: string) => {
 }
 
 const handleCommand = async (command: string, host: DockerHost) => {
-  switch (command) {
-    case 'connect':
-      if (host.status === 'connected') {
-        await dockerStore.disconnectHost(host.id)
-      } else {
-        await dockerStore.connectHost(host)
-      }
-      break
-    case 'edit':
-      editingHost.value = host
-      addHostDialogRef.value?.open()
-      break
-    case 'delete':
-      ElMessageBox.confirm(
-        '确定要删除这个主机吗？这将断开所有连接。',
-        '删除主机',
-        {
-          type: 'warning',
+  try {
+    switch (command) {
+      case 'connect':
+        if (host.status === 'connected') {
+          await dockerStore.disconnectHost(host.id)
+        } else {
+          await dockerStore.connectHost(host.id)
         }
-      )
-        .then(async () => {
-          await dockerStore.removeHost(host.id)
-          ElMessage.success('主机已删除')
-        })
-        .catch(() => {})
-      break
+        break
+        
+      case 'edit':
+        editingHost.value = host
+        addHostDialogRef.value?.open()
+        break
+        
+      case 'delete':
+        ElMessageBox.confirm(
+          '确定要删除这个主机吗？这将断开所有连接。',
+          '删除主机',
+          {
+            type: 'warning',
+          }
+        )
+          .then(async () => {
+            await dockerStore.removeHost(host.id)
+            ElMessage.success('主机已删除')
+          })
+          .catch(() => {})
+        break
+    }
+  } catch (error) {
+    ElMessage.error(`操作失败: ${(error as Error).message}`)
   }
 }
 
@@ -239,11 +220,8 @@ const handleHostClick = (host: DockerHost) => {
 .host-name {
   margin: 0;
   flex: 1;
-  margin-left: 8px;
+  margin-left: 10px;
   font-size: 16px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .host-info {
@@ -253,7 +231,7 @@ const handleHostClick = (host: DockerHost) => {
 .info-item {
   margin-bottom: 8px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .info-item .label {
@@ -263,36 +241,13 @@ const handleHostClick = (host: DockerHost) => {
 
 .info-item .value {
   flex: 1;
-}
-
-.resource-usage {
-  margin-top: 16px;
-}
-
-.usage-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.usage-item .label {
-  width: 50px;
-  color: #909399;
-}
-
-.usage-item :deep(.el-progress) {
-  flex: 1;
-  margin: 0 8px;
-}
-
-.usage-item .value {
-  width: 45px;
-  text-align: right;
+  word-break: break-all;
 }
 
 .add-host-card {
-  height: 193px;
-  border: 1px dashed #dcdfe6;
+  height: 100%;
+  min-height: 200px;
+  border: 2px dashed #dcdfe6;
   border-radius: 4px;
   display: flex;
   flex-direction: column;
@@ -300,7 +255,6 @@ const handleHostClick = (host: DockerHost) => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s;
-  margin-bottom: 16px;
 }
 
 .add-host-card:hover {
@@ -311,5 +265,10 @@ const handleHostClick = (host: DockerHost) => {
 .add-host-card .el-icon {
   font-size: 24px;
   margin-bottom: 8px;
+}
+
+.status-tag {
+  min-width: 60px;
+  text-align: center;
 }
 </style> 

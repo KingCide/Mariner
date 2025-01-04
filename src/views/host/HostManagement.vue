@@ -89,8 +89,8 @@ const hostStatus = computed(() => host.value?.status || 'disconnected')
 // 监听主机状态变化
 watch(hostStatus, (newStatus) => {
   if (newStatus === 'disconnected') {
-    // 如果主机断开连接，跳转到容器页面（会显示未连接状态）
-    router.push({ name: 'containers', params: { id: hostId.value } })
+    // 如果主机断开连接，返回主机列表
+    router.push({ name: 'hosts' })
   }
 })
 
@@ -102,20 +102,40 @@ onMounted(async () => {
     return
   }
 
-  // 如果主机未连接，默认跳转到容器页面
+  // 设置当前选中的主机ID
+  dockerStore.selectedHostId = hostId.value
+
+  // 如果主机未连接，尝试连接
+  if (host.value.status !== 'connected') {
+    try {
+      await dockerStore.connectHost(hostId.value)
+    } catch (error) {
+      console.error('Failed to connect host:', error)
+      // 连接失败时返回主机列表
+      router.push({ name: 'hosts' })
+      return
+    }
+  }
+
+  // 默认跳转到容器页面
   if (route.name === 'hostManagement') {
-    router.push({ name: 'containers', params: { id: hostId.value } })
+    await router.push({ name: 'containers', params: { id: hostId.value } })
+    // 加载容器列表
+    await dockerStore.refreshContainers()
   }
 })
 
 // 刷新当前页面数据
 const handleRefresh = async () => {
-  if (route.name === 'containers') {
-    await dockerStore.refreshContainers(hostId.value)
-  } else if (route.name === 'images') {
-    await dockerStore.refreshImages(hostId.value)
+  try {
+    if (route.name === 'containers') {
+      await dockerStore.refreshContainers()
+    } else if (route.name === 'images') {
+      await dockerStore.refreshImages()
+    }
+  } catch (error) {
+    console.error('Failed to refresh:', error)
   }
-  // TODO: 添加其他页面的刷新逻辑
 }
 
 // 连接/断开主机
@@ -125,8 +145,13 @@ const handleToggleConnection = async () => {
   try {
     if (hostStatus.value === 'connected') {
       await dockerStore.disconnectHost(hostId.value)
+      // 断开连接后返回主机列表
+      router.push({ name: 'hosts' })
     } else {
-      await dockerStore.connectHost(host.value)
+      dockerStore.selectedHostId = hostId.value
+      await dockerStore.connectHost(hostId.value)
+      // 连接成功后刷新数据
+      await handleRefresh()
     }
   } catch (error) {
     console.error('Failed to toggle connection:', error)

@@ -1,14 +1,4 @@
-import type { DockerHost, Container, ContainerStats, ImageInfo } from '../../types/docker'
-
-declare global {
-  interface Window {
-    electron: {
-      ipcRenderer: {
-        invoke(channel: string, ...args: any[]): Promise<any>
-      }
-    }
-  }
-}
+import type { DockerHost, Container, ContainerStats, ImageInfo, ContainerListResponse } from '../../types/docker'
 
 const ipc = window.electron.ipcRenderer
 
@@ -22,10 +12,14 @@ export class DockerService {
   }
 
   async testSSHConnection(host: DockerHost): Promise<boolean> {
-    return ipc.invoke('docker:testSSH', host)
+    return await ipc.invoke('docker:testSSH', host)
   }
 
-  async listContainers(hostId: string): Promise<Container[]> {
+  async testTCPConnection(host: DockerHost): Promise<boolean> {
+    return await ipc.invoke('docker:testTCP', host)
+  }
+
+  async listContainers(hostId: string): Promise<ContainerListResponse> {
     return ipc.invoke('docker:listContainers', hostId)
   }
 
@@ -51,5 +45,22 @@ export class DockerService {
 
   async getContainerLogs(hostId: string, containerId: string): Promise<string> {
     return ipc.invoke('docker:containerLogs', { hostId, containerId })
+  }
+
+  async deleteContainer(hostId: string, containerId: string) {
+    return ipc.invoke('docker:deleteContainer', { hostId, containerId })
+  }
+
+  // 镜像相关方法
+  async pullImage(hostId: string, imageName: string) {
+    return ipc.invoke('docker:pullImage', { hostId, imageName })
+  }
+
+  async exportImage(hostId: string, imageId: string, savePath: string) {
+    return ipc.invoke('docker:exportImage', { hostId, imageId, savePath })
+  }
+
+  async deleteImage(hostId: string, imageId: string) {
+    return ipc.invoke('docker:deleteImage', { hostId, imageId })
   }
 } 

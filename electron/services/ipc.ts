@@ -29,9 +29,19 @@ export class IpcService {
       return this.dockerService.disconnect(hostId)
     })
 
+    // 检查本地 Docker
+    ipcMain.handle('docker:checkLocal', async () => {
+      return this.dockerService.checkLocalDocker()
+    })
+
     // SSH连接测试
     ipcMain.handle('docker:testSSH', async (_: IpcMainInvokeEvent, host: any) => {
       return this.dockerService.testSSHConnection(host)
+    })
+
+    // TCP连接测试
+    ipcMain.handle('docker:testTCP', async (_: IpcMainInvokeEvent, host: any) => {
+      return this.dockerService.testTCPConnection(host)
     })
 
     // 容器管理
@@ -62,6 +72,18 @@ export class IpcService {
     // 镜像管理
     ipcMain.handle('docker:listImages', async (_: IpcMainInvokeEvent, hostId: string) => {
       return this.dockerService.listImages(hostId)
+    })
+
+    ipcMain.handle('docker:pullImage', async (_: IpcMainInvokeEvent, { hostId, imageName }: { hostId: string; imageName: string }) => {
+      return this.dockerService.pullImage(hostId, imageName)
+    })
+
+    ipcMain.handle('docker:exportImage', async (_: IpcMainInvokeEvent, { hostId, imageId, savePath }: { hostId: string; imageId: string; savePath: string }) => {
+      return this.dockerService.exportImage(hostId, imageId, savePath)
+    })
+
+    ipcMain.handle('docker:deleteImage', async (_: IpcMainInvokeEvent, { hostId, imageId }: { hostId: string; imageId: string }) => {
+      return this.dockerService.deleteImage(hostId, imageId)
     })
 
     // 容器日志

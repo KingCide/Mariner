@@ -58,6 +58,15 @@ class Application {
       this.mainWindow?.show()
     })
 
+    // 监听窗口最大化状态变化
+    this.mainWindow.on('maximize', () => {
+      this.mainWindow?.webContents.send('window-state-change', true)
+    })
+
+    this.mainWindow.on('unmaximize', () => {
+      this.mainWindow?.webContents.send('window-state-change', false)
+    })
+
     // 处理外部链接
     this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url)

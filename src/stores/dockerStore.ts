@@ -1,299 +1,388 @@
 import { defineStore } from 'pinia'
-import type { DockerHost, Container, ImageInfo, Volume, Network, ContainerListResponse, ContainerDetails } from '../../types/docker'
+import { ref, computed } from 'vue'
+import { DockerService } from '../services/docker'
+import type { DockerHost, Container, ImageInfo } from '../../types/docker'
 
-interface HostStats {
-  containers: number
-  images: number
-  cpu: number
-  memory: number
-}
+const dockerService = new DockerService()
 
-interface DockerState {
-  hosts: DockerHost[]
-  activeHostId: string | null
-  containers: ContainerDetails[]
-  images: ImageInfo[]
-  volumes: Volume[]
-  networks: Network[]
-  loading: boolean
-  error: string | null
-  hostStats: Record<string, HostStats>
-}
+export const useDockerStore = defineStore('docker', () => {
+  const hosts = ref<DockerHost[]>([])
+  const selectedHostId = ref<string | null>(null)
+  const containers = ref<Container[]>([])
+  const images = ref<ImageInfo[]>([])
+  const loading = ref<boolean>(false)
+  const error = ref<string | null>(null)
 
-export const useDockerStore = defineStore('docker', {
-  state: (): DockerState => ({
-    hosts: [],
-    activeHostId: null,
-    containers: [],
-    images: [],
-    volumes: [],
-    networks: [],
-    loading: false,
-    error: null,
-    hostStats: {}
-  }),
+  // 计算属性
+  const selectedHost = computed(() => 
+    hosts.value.find(h => h.id === selectedHostId.value)
+  )
 
-  getters: {
-    activeHost: (state) => state.hosts.find(h => h.id === state.activeHostId),
-    runningContainers: (state) => state.containers.filter(c => c.status === 'running'),
-    stoppedContainers: (state) => state.containers.filter(c => c.status !== 'running'),
-    favoriteImages: (state) => state.images.filter(i => i.favorite)
-  },
+  const isConnected = computed(() =>
+    selectedHost.value?.status === 'connected'
+  )
 
-  actions: {
-    async addHost(host: Omit<DockerHost, 'id' | 'status'>) {
-      this.loading = true
-      try {
-        this.hosts.push({
-          ...host,
-          id: crypto.randomUUID(),
-          status: 'disconnected'
-        })
-      } catch (err) {
-        this.error = (err as Error).message
-      } finally {
-        this.loading = false
+  // 添加运行中容器的计算属性
+  const runningContainers = computed(() =>
+    Array.isArray(containers.value) ? containers.value.filter(c => c.status === 'running') : []
+  )
+
+  // 添加主机统计信息
+  const hostStats = ref<Record<string, { containers: number; cpu: number; memory: number }>>({})
+
+  // 更新主机统计信息
+  const updateHostStats = (hostId: string, stats: { containers: number; cpu: number; memory: number }) => {
+    hostStats.value[hostId] = stats
+  }
+
+  // 添加 activeHostId 计算属性
+  const activeHostId = computed(() => selectedHostId.value)
+
+  // 容器统计信息
+  const getContainerStats = async (hostId: string, containerId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      return await dockerService.getContainerStats(hostId, containerId)
+    } catch (err) {
+      error.value = `获取容器统计信息失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 主机管理
+  const addHost = async (host: Omit<DockerHost, 'id' | 'status'>) => {
+    try {
+      const newHost: DockerHost = {
+        id: crypto.randomUUID(),
+        status: 'disconnected',
+        ...host
       }
-    },
+      hosts.value.push(newHost)
+      return newHost
+    } catch (err) {
+      error.value = `添加主机失败: ${(err as Error).message}`
+      throw err
+    }
+  }
 
-    async removeHost(id: string) {
-      const index = this.hosts.findIndex(h => h.id === id)
-      if (index > -1) {
-        this.hosts.splice(index, 1)
-        if (this.activeHostId === id) {
-          this.activeHostId = null
+  const updateHost = async (host: DockerHost) => {
+    try {
+      const index = hosts.value.findIndex(h => h.id === host.id)
+      if (index === -1) {
+        throw new Error('主机不存在')
+      }
+      hosts.value[index] = host
+    } catch (err) {
+      error.value = `更新主机失败: ${(err as Error).message}`
+      throw err
+    }
+  }
+
+  const removeHost = async (hostId: string) => {
+    try {
+      const index = hosts.value.findIndex(h => h.id === hostId)
+      if (index === -1) {
+        throw new Error('主机不存在')
+      }
+      
+      // 如果是当前选中的主机，先断开连接
+      if (hostId === selectedHostId.value) {
+        await disconnectHost(hostId)
+        selectedHostId.value = null
+      }
+      
+      hosts.value.splice(index, 1)
+    } catch (err) {
+      error.value = `删除主机失败: ${(err as Error).message}`
+      throw err
+    }
+  }
+
+  // 连接管理
+  const connectHost = async (hostId: string) => {
+    let targetHost: DockerHost | undefined
+    
+    try {
+      loading.value = true
+      error.value = null
+      
+      targetHost = hosts.value.find(h => h.id === hostId)
+      if (!targetHost) {
+        throw new Error('主机不存在')
+      }
+
+      // 更新状态为连接中
+      targetHost.status = 'connecting'
+      
+      // 创建一个简化的主机配置对象
+      const hostConfig: DockerHost = {
+        id: targetHost.id,
+        name: targetHost.name,
+        connectionType: targetHost.connectionType,
+        status: 'connecting',
+        config: {
+          host: targetHost.config.host,
+          port: targetHost.config.port,
+          socketPath: targetHost.config.socketPath,
+          certPath: targetHost.config.certPath,
+          sshConfig: targetHost.config.sshConfig ? {
+            username: targetHost.config.sshConfig.username,
+            password: targetHost.config.sshConfig.password,
+            privateKey: targetHost.config.sshConfig.privateKey,
+            passphrase: targetHost.config.sshConfig.passphrase
+          } : undefined
         }
       }
-    },
-
-    async setActiveHost(id: string) {
-      this.activeHostId = id
-    },
-
-    async connectHost(host: DockerHost) {
-      this.loading = true
-      try {
-        // 只传递最基本的连接信息
-        const connectionConfig = {
-          id: host.id,
-          connectionType: host.connectionType,
-          config: {
-            host: host.config.host,
-            port: host.config.port,
-            socketPath: host.config.socketPath,
-            certPath: host.config.certPath,
-            sshConfig: host.config.sshConfig ? {
-              username: host.config.sshConfig.username,
-              password: host.config.sshConfig.password,
-              privateKey: host.config.sshConfig.privateKey,
-              passphrase: host.config.sshConfig.passphrase
-            } : undefined
-          }
-        }
-        
-        await window.electron.ipcRenderer.invoke('docker:connect', connectionConfig)
-        const index = this.hosts.findIndex(h => h.id === host.id)
-        if (index > -1) {
-          this.hosts[index].status = 'connected'
-        }
-        this.activeHostId = host.id
-      } catch (err) {
-        this.error = (err as Error).message
-        throw err
-      } finally {
-        this.loading = false
+      
+      // 获取主机信息
+      const info = await dockerService.connectHost(hostConfig)
+      
+      // 更新主机信息和状态
+      targetHost.info = info
+      targetHost.status = 'connected'
+      selectedHostId.value = hostId
+      
+      // 加载容器和镜像列表
+      await Promise.all([
+        refreshContainers(),
+        refreshImages(hostId)
+      ])
+    } catch (err) {
+      if (targetHost) {
+        targetHost.status = 'error'
       }
-    },
+      error.value = `连接失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
 
-    async disconnectHost(id: string) {
-      this.loading = true
-      try {
-        await window.electron.ipcRenderer.invoke('docker:disconnect', id)
-        const index = this.hosts.findIndex(h => h.id === id)
-        if (index > -1) {
-          this.hosts[index].status = 'disconnected'
-        }
-        if (this.activeHostId === id) {
-          this.activeHostId = null
-        }
-      } catch (err) {
-        this.error = (err as Error).message
-        throw err
-      } finally {
-        this.loading = false
+  const disconnectHost = async (hostId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      
+      const host = hosts.value.find(h => h.id === hostId)
+      if (!host) {
+        throw new Error('主机不存在')
       }
-    },
 
-    async refreshContainers(hostId: string) {
-      if (!hostId) return
-      this.loading = true
-      try {
-        const response = await window.electron.ipcRenderer.invoke('docker:listContainers', hostId)
-        this.containers = response.containers
-        // 更新主机统计信息
-        this.hostStats[hostId] = {
-          ...this.hostStats[hostId] || {},
+      await dockerService.disconnectHost(hostId)
+      
+      // 清空相关数据
+      if (hostId === selectedHostId.value) {
+        selectedHostId.value = null
+        containers.value = []
+        images.value = []
+      }
+      
+      host.status = 'disconnected'
+    } catch (err) {
+      error.value = `断开连接失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 容器管理
+  const refreshContainers = async () => {
+    if (!selectedHostId.value || !isConnected.value) return
+    
+    try {
+      loading.value = true
+      error.value = null
+      const response = await dockerService.listContainers(selectedHostId.value)
+      containers.value = response.containers
+      
+      // 更新主机统计信息
+      if (selectedHostId.value) {
+        updateHostStats(selectedHostId.value, {
           containers: response.stats.totalCount,
           cpu: response.stats.cpu,
           memory: response.stats.memory
-        }
-      } catch (err) {
-        this.error = (err as Error).message
-      } finally {
-        this.loading = false
+        })
       }
-    },
-
-    async refreshImages(hostId: string) {
-      if (!hostId) return
-      this.loading = true
-      try {
-        const images = await window.electron.ipcRenderer.invoke('docker:listImages', hostId)
-        this.images = images
-        // 更新主机统计信息中的镜像数量
-        if (this.hostStats[hostId]) {
-          this.hostStats[hostId].images = images.length
-        }
-      } catch (err) {
-        this.error = (err as Error).message
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async startContainer(hostId: string, containerId: string) {
-      await window.electron.ipcRenderer.invoke('docker:startContainer', { hostId, containerId })
-    },
-
-    async stopContainer(hostId: string, containerId: string) {
-      await window.electron.ipcRenderer.invoke('docker:stopContainer', { hostId, containerId })
-    },
-
-    async restartContainer(hostId: string, containerId: string) {
-      await window.electron.ipcRenderer.invoke('docker:restartContainer', { hostId, containerId })
-    },
-
-    async deleteContainer(hostId: string, containerId: string) {
-      await window.electron.ipcRenderer.invoke('docker:deleteContainer', { hostId, containerId })
-    },
-
-    async getContainerLogs(hostId: string, containerId: string) {
-      return window.electron.ipcRenderer.invoke('docker:containerLogs', { hostId, containerId })
-    },
-
-    async getContainerStats(hostId: string, containerId: string) {
-      this.loading = true
-      try {
-        const stats = await window.electron.ipcRenderer.invoke('docker:getContainerStats', { hostId, containerId })
-        return stats
-      } catch (err) {
-        this.error = (err as Error).message
-        throw err
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async inspectContainer(hostId: string, containerId: string) {
-      return window.electron.ipcRenderer.invoke('docker:inspectContainer', { hostId, containerId })
-    },
-
-    async execContainer(hostId: string, containerId: string, command: string[]) {
-      return window.electron.ipcRenderer.invoke('docker:execContainer', { hostId, containerId, command })
-    },
-
-    async attachContainer(hostId: string, containerId: string) {
-      return window.electron.ipcRenderer.invoke('docker:attachContainer', { hostId, containerId })
-    },
-
-    async pullImage(hostId: string, tag: string) {
-      await window.electron.ipcRenderer.invoke('docker:pullImage', { hostId, tag })
-    },
-
-    async exportImage(hostId: string, imageId: string) {
-      await window.electron.ipcRenderer.invoke('docker:exportImage', { hostId, imageId })
-    },
-
-    async deleteImage(hostId: string, imageId: string) {
-      await window.electron.ipcRenderer.invoke('docker:deleteImage', { hostId, imageId })
-    },
-
-    async inspectImage(hostId: string, imageId: string) {
-      return window.electron.ipcRenderer.invoke('docker:inspectImage', { hostId, imageId })
-    },
-
-    async refreshVolumes(hostId: string) {
-      if (!hostId) return
-      this.loading = true
-      try {
-        const volumes = await window.electron.ipcRenderer.invoke('docker:listVolumes', hostId)
-        this.volumes = volumes
-      } catch (err) {
-        this.error = (err as Error).message
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async createVolume(hostId: string, options: { name: string, driver: string, labels: Record<string, string> }) {
-      await window.electron.ipcRenderer.invoke('docker:createVolume', { hostId, ...options })
-    },
-
-    async deleteVolume(hostId: string, name: string) {
-      await window.electron.ipcRenderer.invoke('docker:deleteVolume', { hostId, name })
-    },
-
-    async inspectVolume(hostId: string, name: string) {
-      return window.electron.ipcRenderer.invoke('docker:inspectVolume', { hostId, name })
-    },
-
-    async refreshNetworks(hostId: string) {
-      if (!hostId) return
-      this.loading = true
-      try {
-        const networks = await window.electron.ipcRenderer.invoke('docker:listNetworks', hostId)
-        this.networks = networks
-      } catch (err) {
-        this.error = (err as Error).message
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async createNetwork(hostId: string, options: {
-      name: string
-      driver: string
-      subnet?: string
-      gateway?: string
-      internal?: boolean
-      labels?: Record<string, string>
-    }) {
-      await window.electron.ipcRenderer.invoke('docker:createNetwork', { hostId, ...options })
-    },
-
-    async deleteNetwork(hostId: string, networkId: string) {
-      await window.electron.ipcRenderer.invoke('docker:deleteNetwork', { hostId, networkId })
-    },
-
-    async inspectNetwork(hostId: string, networkId: string) {
-      return window.electron.ipcRenderer.invoke('docker:inspectNetwork', { hostId, networkId })
-    },
-
-    async connectContainerToNetwork(hostId: string, networkId: string, containerId: string, aliases?: string[]) {
-      await window.electron.ipcRenderer.invoke('docker:connectNetwork', {
-        hostId,
-        networkId,
-        containerId,
-        aliases
-      })
-    },
-
-    async disconnectContainerFromNetwork(hostId: string, networkId: string, containerId: string) {
-      await window.electron.ipcRenderer.invoke('docker:disconnectNetwork', {
-        hostId,
-        networkId,
-        containerId
-      })
+    } catch (err) {
+      error.value = `加载容器列表失败: ${(err as Error).message}`
+      containers.value = []
+      throw err
+    } finally {
+      loading.value = false
     }
   }
+
+  // 镜像管理
+  const refreshImages = async (hostId?: string) => {
+    const targetHostId = hostId || selectedHostId.value
+    if (!targetHostId || !isConnected.value) return
+
+    try {
+      loading.value = true
+      error.value = null
+      const imageList = await dockerService.listImages(targetHostId)
+      images.value = imageList
+    } catch (err) {
+      error.value = `Failed to refresh images: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 测试连接
+  const testConnection = async (host: DockerHost) => {
+    try {
+      loading.value = true
+      error.value = null
+      
+      if (host.connectionType === 'ssh') {
+        return await dockerService.testSSHConnection(host)
+      }
+      
+      // 对于其他连接类型，尝试直接连接
+      await dockerService.connectHost(host)
+      await dockerService.disconnectHost(host.id)
+      return true
+    } catch (err) {
+      error.value = `连接测试失败: ${(err as Error).message}`
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 容器操作方法
+  const startContainer = async (hostId: string, containerId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await dockerService.startContainer(hostId, containerId)
+    } catch (err) {
+      error.value = `启动容器失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const stopContainer = async (hostId: string, containerId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await dockerService.stopContainer(hostId, containerId)
+    } catch (err) {
+      error.value = `停止容器失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const restartContainer = async (hostId: string, containerId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await dockerService.restartContainer(hostId, containerId)
+    } catch (err) {
+      error.value = `重启容器失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const deleteContainer = async (hostId: string, containerId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await dockerService.deleteContainer(hostId, containerId)
+    } catch (err) {
+      error.value = `删除容器失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  // 镜像相关方法
+  const pullImage = async (hostId: string, imageName: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await dockerService.pullImage(hostId, imageName)
+      await refreshImages()
+    } catch (err) {
+      error.value = `拉取镜像失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const exportImage = async (hostId: string, imageId: string, savePath: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await dockerService.exportImage(hostId, imageId, savePath)
+    } catch (err) {
+      error.value = `导出镜像失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const deleteImage = async (hostId: string, imageId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await dockerService.deleteImage(hostId, imageId)
+      await refreshImages()
+    } catch (err) {
+      error.value = `删除镜像失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    // 状态
+    hosts,
+    selectedHostId,
+    containers,
+    images,
+    loading,
+    error,
+    hostStats,
+    
+    // 计算属性
+    selectedHost,
+    isConnected,
+    runningContainers,
+    activeHostId,
+    
+    // 方法
+    addHost,
+    updateHost,
+    removeHost,
+    connectHost,
+    disconnectHost,
+    refreshContainers,
+    refreshImages,
+    testConnection,
+    startContainer,
+    stopContainer,
+    restartContainer,
+    deleteContainer,
+    getContainerStats,
+    pullImage,
+    exportImage,
+    deleteImage
+  }
+  
 }) 

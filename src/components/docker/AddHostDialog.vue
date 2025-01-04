@@ -11,12 +11,10 @@
         <SSHConfigForm @saved="handleSaved" />
       </el-tab-pane>
       <el-tab-pane label="TCP连接" name="tcp">
-        <!-- TODO: 实现TCP连接配置表单 -->
-        <div>TCP连接配置（开发中）</div>
+        <TCPConfigForm @saved="handleSaved" />
       </el-tab-pane>
       <el-tab-pane label="本地Docker" name="local">
-        <!-- TODO: 实现本地Docker配置表单 -->
-        <div>本地Docker配置（开发中）</div>
+        <LocalConfigForm @saved="handleSaved" />
       </el-tab-pane>
     </el-tabs>
   </el-dialog>
@@ -25,6 +23,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import SSHConfigForm from './SSHConfigForm.vue'
+import TCPConfigForm from './TCPConfigForm.vue'
+import LocalConfigForm from './LocalConfigForm.vue'
 
 const dialogVisible = ref(false)
 const activeTab = ref('ssh')

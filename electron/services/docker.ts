@@ -2,7 +2,10 @@ import Docker from 'dockerode'
 import { Client } from 'ssh2'
 import { Server, createServer } from 'net'
 import { readFileSync } from 'fs'
-import type { ContainerListResponse, ContainerDetails } from '../../types/docker'
+import { access } from 'fs/promises'
+import { platform } from 'os'
+import { constants } from 'fs'
+import type { ContainerListResponse, ContainerDetails, DockerHost } from '../../types/docker'
 
 // 日志级别定义
 enum LogLevel {
@@ -42,7 +45,32 @@ export class DockerService {
     }
   }
 
-  async connect(host: any) {
+  // 获取本地 Docker socket 路径
+  private getLocalSocketPath(): string {
+    return platform() === 'win32'
+      ? '//./pipe/docker_engine'
+      : '/var/run/docker.sock'
+  }
+
+  // 检查本地 Docker 是否可用
+  public async checkLocalDocker(): Promise<boolean> {
+    try {
+      const socketPath = this.getLocalSocketPath()
+      await access(socketPath, constants.R_OK | constants.W_OK)
+      
+      // 尝试创建连接并测试
+      const docker = new Docker({ socketPath })
+      await docker.ping()
+      
+      return true
+    } catch (error) {
+      this.log(LogLevel.DEBUG, 'Local Docker not available', { error })
+      return false
+    }
+  }
+
+  // 连接到 Docker 主机
+  async connect(host: DockerHost) {
     try {
       this.log(LogLevel.INFO, 'Connecting to Docker host', { 
         id: host.id, 
@@ -55,7 +83,10 @@ export class DockerService {
       switch (host.connectionType) {
         case 'local':
           this.log(LogLevel.DEBUG, 'Initializing local Docker connection')
-          docker = new Docker()
+          if (!await this.checkLocalDocker()) {
+            throw new Error('Local Docker is not available')
+          }
+          docker = new Docker({ socketPath: this.getLocalSocketPath() })
           break
         
         case 'tcp':
@@ -63,20 +94,35 @@ export class DockerService {
             host: host.config.host,
             port: host.config.port
           })
-          docker = new Docker({
+          
+          if (!host.config.host || !host.config.port) {
+            throw new Error('TCP connection requires host and port')
+          }
+          
+          const tcpOptions: any = {
             host: host.config.host,
-            port: host.config.port,
-            ca: host.config.certPath ? readFileSync(`${host.config.certPath}/ca.pem`) : undefined,
-            cert: host.config.certPath ? readFileSync(`${host.config.certPath}/cert.pem`) : undefined,
-            key: host.config.certPath ? readFileSync(`${host.config.certPath}/key.pem`) : undefined,
-          })
+            port: host.config.port
+          }
+          
+          if (host.config.certPath) {
+            try {
+              tcpOptions.ca = readFileSync(`${host.config.certPath}/ca.pem`)
+              tcpOptions.cert = readFileSync(`${host.config.certPath}/cert.pem`)
+              tcpOptions.key = readFileSync(`${host.config.certPath}/key.pem`)
+            } catch (error) {
+              this.log(LogLevel.ERROR, 'Failed to read TLS certificates', error)
+              throw new Error('Failed to read TLS certificates')
+            }
+          }
+          
+          docker = new Docker(tcpOptions)
           break
 
         case 'ssh':
           this.log(LogLevel.DEBUG, 'Initializing SSH Docker connection', {
             host: host.config.host,
             port: host.config.port,
-            username: host.config.sshConfig.username
+            username: host.config.sshConfig?.username
           })
           
           if (!host.config.sshConfig) {
@@ -121,13 +167,25 @@ export class DockerService {
           throw new Error(`Unsupported connection type: ${host.connectionType}`)
       }
 
-      // 测试连接
+      // 测试连接并获取 Docker 信息
       this.log(LogLevel.DEBUG, 'Testing Docker connection')
-      await docker.ping()
-      this.log(LogLevel.INFO, 'Docker connection successful')
+      const info = await docker.info()
+      this.log(LogLevel.INFO, 'Docker connection successful', {
+        version: info.ServerVersion,
+        containers: info.Containers,
+        images: info.Images
+      })
       
       this.connections.set(host.id, docker)
-      return true
+      return {
+        version: info.ServerVersion,
+        containers: info.Containers,
+        images: info.Images,
+        os: info.OperatingSystem,
+        kernelVersion: info.KernelVersion,
+        cpus: info.NCPU,
+        memory: info.MemTotal
+      }
     } catch (error) {
       this.log(LogLevel.ERROR, 'Docker connection failed', error)
       if (host.connectionType === 'ssh') {
@@ -175,11 +233,12 @@ export class DockerService {
               state: inspect.State.Status,
               status: this.formatContainerStatus(inspect.State),
               created: new Date(container.Created * 1000).toISOString(),
-              ports: container.Ports.map(port => ({
+              ports: this.deduplicatePorts(container.Ports.map(port => ({
                 privatePort: port.PrivatePort,
                 publicPort: port.PublicPort,
                 type: port.Type
-              })),
+              })
+              )),
               mounts: container.Mounts.map(mount => ({
                 type: mount.Type,
                 source: mount.Source,
@@ -370,106 +429,105 @@ export class DockerService {
     return docker.getContainer(containerId)
   }
 
+  // 创建 SSH 隧道
   private async createTunnel(hostId: string, config: any): Promise<{ server: Server; client: Client }> {
     return new Promise((resolve, reject) => {
-      const client = new Client()
+      try {
+        const client = new Client()
+        const server = createServer()
 
-      client.on('ready', () => {
-        console.log('SSH client ready')
-        const server = createServer((socket) => {
-          client.forwardOut(
-            config.localHost,
-            config.localPort,
-            config.dstHost,
-            config.dstPort,
-            (err: Error | undefined, stream) => {
-              if (err) {
-                console.error('Port forwarding error:', err)
-                socket.end()
-                return
+        server.listen(0, 'localhost', () => {
+          const address = server.address()
+          if (!address || typeof address === 'string') {
+            reject(new Error('Invalid server address'))
+            return
+          }
+
+          server.on('connection', (socket) => {
+            client.forwardOut(
+              'localhost',
+              address.port,
+              config.dstHost,
+              config.dstPort,
+              (err, stream) => {
+                if (err) {
+                  socket.end()
+                  this.log(LogLevel.ERROR, 'SSH tunnel forward failed', err)
+                  return
+                }
+                socket.pipe(stream).pipe(socket)
               }
+            )
+          })
 
-              socket.pipe(stream)
-              stream.pipe(socket)
+          client.on('ready', () => {
+            this.log(LogLevel.INFO, 'SSH client ready')
+            resolve({ server, client })
+          })
 
-              stream.on('error', (err: Error) => {
-                console.error('Stream error:', err)
-                socket.end()
-              })
+          client.on('error', (err) => {
+            this.log(LogLevel.ERROR, 'SSH client error', err)
+            reject(err)
+          })
 
-              socket.on('error', (err: Error) => {
-                console.error('Socket error:', err)
-                stream.end()
-              })
-            }
-          )
+          const connectConfig = {
+            host: config.host,
+            port: config.port,
+            username: config.username,
+            ...(config.password
+              ? { password: config.password }
+              : {
+                  privateKey: config.privateKey,
+                  passphrase: config.passphrase
+                }
+            )
+          }
+
+          this.log(LogLevel.DEBUG, 'Connecting SSH client', {
+            host: config.host,
+            port: config.port,
+            username: config.username
+          })
+
+          client.connect(connectConfig)
         })
 
         server.on('error', (err) => {
-          console.error('Server error:', err)
-          this.closeTunnel(hostId)
+          this.log(LogLevel.ERROR, 'SSH tunnel server error', err)
+          reject(err)
         })
-
-        server.listen(config.localPort, config.localHost, () => {
-          console.log('Local server listening')
-          resolve({ server, client })
-        })
-      })
-
-      client.on('error', (err) => {
-        console.error('SSH client error:', err)
-        reject(err)
-      })
-
-      console.log('Connecting SSH client...')
-      client.connect({
-        host: config.host,
-        port: config.port,
-        username: config.username,
-        ...(config.password
-          ? { password: config.password }
-          : {
-              privateKey: config.privateKey,
-              passphrase: config.passphrase
-            }
-        ),
-        readyTimeout: 30000,
-        keepaliveInterval: 30000,
-        keepaliveCountMax: 3
-      })
+      } catch (error) {
+        this.log(LogLevel.ERROR, 'Failed to create SSH tunnel', error)
+        reject(error)
+      }
     })
   }
 
-  private async closeTunnel(hostId: string) {
+  // 关闭 SSH 隧道
+  private async closeTunnel(hostId: string): Promise<void> {
     const tunnel = this.tunnels.get(hostId)
     if (tunnel) {
-      this.log(LogLevel.DEBUG, 'Closing SSH tunnel', { hostId })
-      tunnel.server.close()
-      tunnel.client.end()
-      this.tunnels.delete(hostId)
-      this.log(LogLevel.INFO, 'SSH tunnel closed', { hostId })
+      try {
+        tunnel.client.end()
+        tunnel.server.close()
+        this.tunnels.delete(hostId)
+        this.log(LogLevel.INFO, 'SSH tunnel closed', { hostId })
+      } catch (error) {
+        this.log(LogLevel.ERROR, 'Failed to close SSH tunnel', error)
+        throw error
+      }
     }
   }
 
-  async testSSHConnection(host: any) {
-    if (!host.config.sshConfig) {
-      throw new Error('SSH configuration is required')
-    }
+  // 测试 SSH 连接
+  public async testSSHConnection(host: any): Promise<boolean> {
+    try {
+      if (!host.config.sshConfig) {
+        throw new Error('SSH configuration is required')
+      }
 
-    return new Promise((resolve, reject) => {
-      const client = new Client()
-
-      client.on('ready', () => {
-        client.end()
-        resolve(true)
-      })
-
-      client.on('error', (err) => {
-        reject(err)
-      })
-
-      client.connect({
-        host: host.config.host,
+      const { server, client } = await this.createTunnel(host.id, {
+        host: host.config.host || 'localhost',
         port: host.config.port || 22,
         username: host.config.sshConfig.username,
         ...(host.config.sshConfig.password
@@ -479,9 +537,21 @@ export class DockerService {
               passphrase: host.config.sshConfig.passphrase
             }
         ),
-        readyTimeout: 30000
+        dstHost: 'localhost',
+        dstPort: 2375,
+        localHost: 'localhost',
+        localPort: 0
       })
-    })
+
+      // 关闭连接
+      client.end()
+      server.close()
+      
+      return true
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'SSH connection test failed', error)
+      return false
+    }
   }
 
   public cleanup(): void {
@@ -492,5 +562,113 @@ export class DockerService {
     }
     this.connections.clear()
     this.log(LogLevel.INFO, 'Docker service cleanup completed')
+  }
+
+  // 添加端口去重方法
+  private deduplicatePorts(ports: Array<{ privatePort: number; publicPort?: number; type: string }>) {
+    const portMap = new Map<string, { privatePort: number; publicPort?: number; type: string }>()
+    
+    ports.forEach(port => {
+      const key = `${port.publicPort || ''}-${port.privatePort}-${port.type}`
+      if (!portMap.has(key)) {
+        portMap.set(key, port)
+      }
+    })
+    
+    return Array.from(portMap.values())
+  }
+
+  // 测试 TCP 连接
+  public async testTCPConnection(host: DockerHost): Promise<boolean> {
+    try {
+      this.log(LogLevel.INFO, 'Testing TCP connection', {
+        host: host.config.host,
+        port: host.config.port
+      })
+
+      if (!host.config.host || !host.config.port) {
+        throw new Error('TCP connection requires host and port')
+      }
+
+      const tcpOptions: any = {
+        host: host.config.host,
+        port: host.config.port
+      }
+
+      // 如果配置了证书路径，添加 TLS 配置
+      if (host.config.certPath) {
+        try {
+          tcpOptions.ca = readFileSync(`${host.config.certPath}/ca.pem`)
+          tcpOptions.cert = readFileSync(`${host.config.certPath}/cert.pem`)
+          tcpOptions.key = readFileSync(`${host.config.certPath}/key.pem`)
+        } catch (error) {
+          this.log(LogLevel.ERROR, 'Failed to read TLS certificates', error)
+          throw new Error('Failed to read TLS certificates')
+        }
+      }
+
+      // 创建临时 Docker 连接并测试
+      const docker = new Docker(tcpOptions)
+      await docker.ping()
+
+      this.log(LogLevel.INFO, 'TCP connection test successful')
+      return true
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'TCP connection test failed', error)
+      return false
+    }
+  }
+
+  // 镜像相关方法
+  async pullImage(hostId: string, imageName: string) {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Pulling image', { hostId, imageName })
+      return await docker.pull(imageName)
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to pull image', error)
+      throw error
+    }
+  }
+
+  async exportImage(hostId: string, imageId: string, savePath: string) {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Exporting image', { hostId, imageId, savePath })
+      const image = docker.getImage(imageId)
+      const stream = await image.get()
+      return await new Promise((resolve, reject) => {
+        stream.pipe(require('fs').createWriteStream(savePath))
+          .on('finish', resolve)
+          .on('error', reject)
+      })
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to export image', error)
+      throw error
+    }
+  }
+
+  async deleteImage(hostId: string, imageId: string) {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Deleting image', { hostId, imageId })
+      const image = docker.getImage(imageId)
+      return await image.remove()
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to delete image', error)
+      throw error
+    }
   }
 } 

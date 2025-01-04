@@ -93,7 +93,7 @@
 
       <el-table-column prop="ports" label="端口" min-width="150">
         <template #default="{ row }">
-          <div v-for="port in row.ports" :key="port.privatePort">
+          <div v-for="port in getUniquePorts(row.ports)" :key="port.privatePort">
             {{ formatPort(port) }}
           </div>
         </template>
@@ -189,7 +189,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
@@ -200,6 +200,7 @@ import {
   Search
 } from '@element-plus/icons-vue'
 import { useDockerStore } from '../../stores/dockerStore'
+import { DockerService } from '../../services/docker'
 import CreateContainerDialog from '../../components/docker/CreateContainerDialog.vue'
 import ContainerLogsDialog from '../../components/docker/ContainerLogsDialog.vue'
 import ContainerStatsDialog from '../../components/docker/ContainerStatsDialog.vue'
@@ -211,9 +212,9 @@ const route = useRoute()
 const dockerStore = useDockerStore()
 const hostId = computed(() => route.params.id as string)
 const loading = computed(() => dockerStore.loading)
-const containers = computed(() => dockerStore.containers)
-const runningContainers = computed(() => dockerStore.runningContainers)
-const hostStats = computed(() => dockerStore.hostStats[hostId.value])
+const containers = computed(() => dockerStore.containers || [])
+const runningContainers = computed(() => dockerStore.runningContainers || [])
+const hostStats = computed(() => dockerStore.hostStats[hostId.value] || { containers: 0, cpu: 0, memory: 0 })
 
 // 组件引用
 const createContainerDialogRef = ref()
@@ -228,9 +229,9 @@ const filteredContainers = computed(() => {
   if (!searchText.value) return containers.value
   const search = searchText.value.toLowerCase()
   return containers.value.filter(container => 
-    container.name.toLowerCase().includes(search) ||
-    container.id.toLowerCase().includes(search) ||
-    container.image.toLowerCase().includes(search)
+    container.name?.toLowerCase().includes(search) ||
+    container.id?.toLowerCase().includes(search) ||
+    container.image?.toLowerCase().includes(search)
   )
 })
 
@@ -256,17 +257,86 @@ const formatPort = (port: { privatePort: number; publicPort?: number; type: stri
   return `${port.privatePort}/${port.type}`
 }
 
+// 获取去重后的端口列表
+const getUniquePorts = (ports: Array<{ privatePort: number; publicPort?: number; type: string }>) => {
+  const portMap = new Map<string, { privatePort: number; publicPort?: number; type: string }>()
+  ports.forEach(port => {
+    const key = `${port.publicPort || ''}-${port.privatePort}-${port.type}`
+    if (!portMap.has(key)) {
+      portMap.set(key, port)
+    }
+  })
+  return Array.from(portMap.values())
+}
+
 // 格式化日期
 const formatDate = (date: string) => {
   return new Date(date).toLocaleString()
 }
 
+// 监听路由参数变化
+watch(() => route.params.id, async (newId) => {
+  if (newId) {
+    await loadData()
+  }
+})
+
+// 加载数据
+const loadData = async () => {
+  try {
+    if (!hostId.value) {
+      console.log('hostId is empty')
+      return
+    }
+    console.log('Loading containers for host:', hostId.value)
+    console.log('Store state:', {
+      selectedHostId: dockerStore.selectedHostId,
+      isConnected: dockerStore.isConnected,
+      containers: dockerStore.containers
+    })
+    
+    // 添加 try-catch 来捕获具体的错误
+    try {
+      const result = await dockerService.listContainers(hostId.value)
+      console.log('Raw API response:', result)
+    } catch (apiError) {
+      console.error('API call failed:', apiError)
+    }
+    
+    await dockerStore.refreshContainers()
+    console.log('Containers after refresh:', dockerStore.containers)
+  } catch (error) {
+    console.error('Failed to load containers:', error)
+  }
+}
+
+// 组件挂载时加载数据
+onMounted(async () => {
+  if (hostId.value) {
+    // 确保选中的主机ID与路由参数一致
+    if (dockerStore.selectedHostId !== hostId.value) {
+      console.log('Syncing host ID:', hostId.value)
+      // 如果主机未连接，先连接主机
+      if (!dockerStore.isConnected) {
+        try {
+          await dockerStore.connectHost(hostId.value)
+        } catch (error) {
+          console.error('Failed to connect to host:', error)
+          ElMessage.error('连接主机失败，请返回主机列表重试')
+          return
+        }
+      }
+    }
+    await loadData()
+  }
+})
+
 // 自动刷新
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
-  refreshContainers()
-  refreshInterval = setInterval(refreshContainers, 10000)
+  // 每30秒自动刷新一次
+  refreshInterval = setInterval(loadData, 30000)
 })
 
 onUnmounted(() => {
@@ -275,23 +345,16 @@ onUnmounted(() => {
   }
 })
 
-// 刷新容器列表
-const refreshContainers = async () => {
-  if (hostId.value) {
-    await dockerStore.refreshContainers(hostId.value)
-  }
-}
-
 // 处理容器操作
 const handleCreate = () => {
-  createContainerDialogRef.value?.show()
+  createContainerDialogRef.value?.open()
 }
 
 const handleStart = async (container: ContainerDetails) => {
   try {
     await dockerStore.startContainer(hostId.value, container.id)
     ElMessage.success('容器已启动')
-    await refreshContainers()
+    await loadData()
   } catch (error) {
     ElMessage.error(`启动失败: ${(error as Error).message}`)
   }
@@ -301,7 +364,7 @@ const handleStop = async (container: ContainerDetails) => {
   try {
     await dockerStore.stopContainer(hostId.value, container.id)
     ElMessage.success('容器已停止')
-    await refreshContainers()
+    await loadData()
   } catch (error) {
     ElMessage.error(`停止失败: ${(error as Error).message}`)
   }
@@ -311,7 +374,7 @@ const handleRestart = async (container: ContainerDetails) => {
   try {
     await dockerStore.restartContainer(hostId.value, container.id)
     ElMessage.success('容器已重启')
-    await refreshContainers()
+    await loadData()
   } catch (error) {
     ElMessage.error(`重启失败: ${(error as Error).message}`)
   }
@@ -324,7 +387,7 @@ const handleDelete = async (container: ContainerDetails) => {
     })
     await dockerStore.deleteContainer(hostId.value, container.id)
     ElMessage.success('容器已删除')
-    await refreshContainers()
+    await loadData()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error(`删除失败: ${(error as Error).message}`)
@@ -354,6 +417,8 @@ const handleTerminal = (container: ContainerDetails) => {
   selectedContainerId.value = container.id
   terminalDialogRef.value?.show()
 }
+
+const dockerService = new DockerService()
 </script>
 
 <style scoped>
