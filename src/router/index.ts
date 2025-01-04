@@ -1,5 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import MainLayout from '../components/layout/MainLayout.vue'
+import MainLayout from '../layouts/MainLayout.vue'
+import HostList from '../components/docker/HostList.vue'
+import HostManagement from '../views/host/HostManagement.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -7,17 +9,42 @@ const router = createRouter({
     {
       path: '/',
       component: MainLayout,
-      redirect: '/hosts',
       children: [
+        {
+          path: '',
+          redirect: '/hosts'
+        },
         {
           path: 'hosts',
           name: 'hosts',
-          component: () => import('../components/docker/HostList.vue')
+          component: HostList
         },
         {
-          path: 'containers',
-          name: 'containers',
-          component: () => import('../components/docker/ContainerList.vue')
+          path: 'host/:id',
+          name: 'hostManagement',
+          component: HostManagement,
+          children: [
+            {
+              path: 'containers',
+              name: 'containers',
+              component: () => import("@/views/host/Containers.vue")
+            },
+            {
+              path: 'images',
+              name: 'images',
+              component: () => import("@/views/host/Images.vue")
+            },
+            {
+              path: 'volumes',
+              name: 'volumes',
+              component: () => import("@/views/host/Volumes.vue")
+            },
+            {
+              path: 'networks',
+              name: 'networks',
+              component: () => import("@/views/host/Networks.vue")
+            }
+          ]
         }
       ]
     }

@@ -2,7 +2,7 @@
   <div class="host-list">
     <el-row :gutter="16">
       <el-col v-for="host in hosts" :key="host.id" :span="8">
-        <el-card class="host-card" :class="{ active: host.id === activeHostId }">
+        <el-card class="host-card" :class="{ active: host.id === activeHostId }" @dblclick="handleHostClick(host)">
           <template #header>
             <div class="card-header">
               <el-tag
@@ -99,38 +99,42 @@ import { More, Plus } from '@element-plus/icons-vue'
 import { useDockerStore } from '../../stores/dockerStore'
 import AddHostDialog from './AddHostDialog.vue'
 import type { DockerHost } from '../../../types/docker'
+import { useRouter } from 'vue-router'
 
 const dockerStore = useDockerStore()
 const addHostDialogRef = ref()
 const editingHost = ref<DockerHost | null>(null)
+const router = useRouter()
 
 const hosts = computed(() => dockerStore.hosts)
 const activeHostId = computed(() => dockerStore.activeHostId)
 const hostStats = computed(() => dockerStore.hostStats)
 
-// 状态更新定时器
-let statsTimer: number | null = null
+// 自动刷新
+let refreshInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
-  // 每30秒更新一次主机状态
-  statsTimer = window.setInterval(refreshHostStats, 30000)
-  refreshHostStats()
+  // 初始刷新
+  hosts.value.forEach(host => refreshHostStats(host))
+  // 每30秒刷新一次
+  refreshInterval = setInterval(() => {
+    hosts.value.forEach(host => refreshHostStats(host))
+  }, 30000)
 })
 
 onUnmounted(() => {
-  if (statsTimer) {
-    clearInterval(statsTimer)
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
   }
 })
 
-const refreshHostStats = async () => {
-  for (const host of hosts.value) {
-    if (host.status === 'connected') {
-      try {
-        await dockerStore.refreshHostStats(host.id)
-      } catch (error) {
-        console.error(`Failed to refresh stats for host ${host.id}:`, error)
-      }
+const refreshHostStats = async (host: DockerHost) => {
+  if (host.status === 'connected') {
+    try {
+      await dockerStore.refreshContainers(host.id)
+      await dockerStore.refreshImages(host.id)
+    } catch (error) {
+      console.error(`Failed to refresh stats for host ${host.id}:`, error)
     }
   }
 }
@@ -198,6 +202,12 @@ const handleAddHost = () => {
 
 const handleHostSaved = () => {
   editingHost.value = null
+}
+
+const handleHostClick = (host: DockerHost) => {
+  if (host.status === 'connected') {
+    router.push({ name: 'containers', params: { id: host.id } })
+  }
 }
 </script>
 

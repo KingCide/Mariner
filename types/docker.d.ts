@@ -23,24 +23,36 @@ export interface Container {
   image: string
   state: string
   status: string
+  created: string
   ports: Array<{
     privatePort: number
-    publicPort: number
+    publicPort?: number
     type: string
   }>
-  created: string
-  labels: Record<string, string>
+  mounts: Array<{
+    type: string
+    source: string
+    destination: string
+  }>
 }
 
-export interface ContainerStats {
-  cpu: number
-  memory: {
-    usage: number
-    limit: number
-  }
-  network: {
-    rx_bytes: number
-    tx_bytes: number
+export interface ContainerDetails extends Container {
+  inspect: any
+  state: any
+  config: any
+  hostConfig: any
+  createdAt: string
+  status: string
+}
+
+export interface ContainerListResponse {
+  containers: ContainerDetails[]
+  stats: {
+    totalCount: number
+    runningCount: number
+    stoppedCount: number
+    cpu: number
+    memory: number
   }
 }
 
@@ -50,5 +62,37 @@ export interface ImageInfo {
   size: number
   created: string
   favorite?: boolean
-  notes?: string
+}
+
+export interface Volume {
+  name: string
+  driver: string
+  mountpoint: string
+  scope: string
+  options: Record<string, string>
+  labels: Record<string, string>
+}
+
+export interface Network {
+  id: string
+  name: string
+  driver: string
+  scope: string
+  ipam: {
+    driver: string
+    config: Array<{
+      subnet: string
+      gateway?: string
+    }>
+  }
+  internal: boolean
+  attachable: boolean
+  ingress: boolean
+  containers: Record<string, {
+    name: string
+    ipv4Address?: string
+    ipv6Address?: string
+  }>
+  options: Record<string, string>
+  labels: Record<string, string>
 } 
