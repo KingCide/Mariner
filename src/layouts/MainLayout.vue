@@ -1,45 +1,64 @@
 <template>
-  <el-container class="main-layout">
+  <v-app>
     <!-- 标题栏 -->
-    <el-header class="title-bar" height="32px">
+    <v-app-bar class="title-bar" height="32" flat>
       <div class="title-left">
         <img src="../assets/logo.png" alt="Logo" class="logo-image" />
         <span class="title-text">Mariner</span>
       </div>
+      <v-spacer></v-spacer>
       <div class="window-controls">
-        <el-button
+        <v-btn
+          icon
+          variant="text"
+          size="small"
           class="control-button settings-button"
           @click="showSettings"
         >
-          <el-icon><Setting /></el-icon>
-        </el-button>
-        <button class="control-button" @click="minimizeWindow">
-          <el-icon><Minus /></el-icon>
-        </button>
-        <button class="control-button" @click="toggleMaximize">
-          <el-icon><component :is="isMaximized ? 'FullScreen' : 'FullScreen'" /></el-icon>
-        </button>
-        <button class="control-button close" @click="closeWindow">
-          <el-icon><Close /></el-icon>
-        </button>
+          <v-icon>mdi-cog</v-icon>
+        </v-btn>
+        <v-btn
+          icon
+          variant="text"
+          size="small"
+          class="control-button"
+          @click="minimizeWindow"
+        >
+          <v-icon>mdi-minus</v-icon>
+        </v-btn>
+        <v-btn
+          icon
+          variant="text"
+          size="small"
+          class="control-button"
+          @click="toggleMaximize"
+        >
+          <v-icon>{{ isMaximized ? 'mdi-window-restore' : 'mdi-window-maximize' }}</v-icon>
+        </v-btn>
+        <v-btn
+          icon
+          variant="text"
+          size="small"
+          class="control-button close"
+          @click="closeWindow"
+        >
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
       </div>
-    </el-header>
+    </v-app-bar>
 
     <!-- 主内容区 -->
-    <el-container class="main-container">
-      <el-main class="main">
-        <router-view />
-      </el-main>
-    </el-container>
+    <v-main class="main-container">
+      <router-view />
+    </v-main>
 
     <!-- 设置对话框 -->
     <settings-dialog ref="settingsDialogRef" />
-  </el-container>
+  </v-app>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Close, Minus, FullScreen, Setting } from '@element-plus/icons-vue'
 import SettingsDialog from '../components/settings/SettingsDialog.vue'
 
 const isMaximized = ref(false)
@@ -52,6 +71,7 @@ const minimizeWindow = () => {
 
 const toggleMaximize = () => {
   window.electron.ipcRenderer.send('window:maximize')
+  isMaximized.value = !isMaximized.value
 }
 
 const closeWindow = () => {
@@ -63,15 +83,13 @@ const showSettings = () => {
 }
 
 // 监听窗口状态变化
-const handleMaximizeChange = (_event: any, maximized: boolean) => {
-  isMaximized.value = maximized
-}
-
 let removeListener: (() => void) | null = null
 
 onMounted(() => {
   // 添加窗口状态监听
-  removeListener = window.electron.ipcRenderer.on('window-state-change', handleMaximizeChange)
+  removeListener = window.electron.ipcRenderer.on('window-state-change', (_event: any, maximized: boolean) => {
+    isMaximized.value = maximized
+  })
 })
 
 onUnmounted(() => {
@@ -83,19 +101,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.main-layout {
-  height: 100vh;
-  border: 1px solid var(--el-border-color-light);
-}
-
 .title-bar {
   -webkit-app-region: drag;
-  background-color: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color-light);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
+  background-color: var(--background-paper) !important;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .title-left {
@@ -112,49 +121,33 @@ onUnmounted(() => {
 .title-text {
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+  color: var(--text-primary);
 }
 
 .window-controls {
   -webkit-app-region: no-drag;
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 
 .control-button {
-  -webkit-app-region: no-drag;
-  background: transparent;
-  border: none;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--el-text-color-regular);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  height: 32px !important;
+  width: 32px !important;
+  min-width: unset !important;
+  border-radius: 0 !important;
+  color: var(--text-primary) !important;
 }
 
 .control-button:hover {
-  background-color: var(--el-fill-color-light);
+  background-color: rgba(0, 0, 0, 0.04) !important;
 }
 
 .control-button.close:hover {
-  background-color: #f56c6c;
-  color: white;
-}
-
-.settings-button {
-  padding: 0;
+  background-color: rgb(232, 17, 35) !important;
+  color: white !important;
 }
 
 .main-container {
-  height: calc(100% - 32px);
-}
-
-.main {
   padding: 0;
-  height: 100%;
-  background-color: var(--el-bg-color-page);
 }
 </style> 
