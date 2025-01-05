@@ -1,56 +1,67 @@
 <template>
   <el-container class="host-management">
-    <el-aside width="200px">
+    <el-aside :width="isCollapse ? '64px' : '200px'" class="sidebar">
+      <div class="sidebar-header">
+        <el-button
+          class="collapse-button"
+          :icon="isCollapse ? 'Expand' : 'Fold'"
+          @click="toggleCollapse"
+        />
+      </div>
       <el-menu
         :router="true"
         :default-active="activeMenu"
         class="host-menu"
+        :collapse="isCollapse"
       >
         <el-menu-item index="containers" :route="{ name: 'containers', params: { id: hostId } }">
           <el-icon><Monitor /></el-icon>
-          <span>容器管理</span>
+          <template #title>容器管理</template>
         </el-menu-item>
         <el-menu-item index="images" :route="{ name: 'images', params: { id: hostId } }">
           <el-icon><Picture /></el-icon>
-          <span>镜像管理</span>
+          <template #title>镜像管理</template>
         </el-menu-item>
         <el-menu-item index="volumes" :route="{ name: 'volumes', params: { id: hostId } }">
           <el-icon><Files /></el-icon>
-          <span>数据卷</span>
+          <template #title>数据卷</template>
         </el-menu-item>
         <el-menu-item index="networks" :route="{ name: 'networks', params: { id: hostId } }">
           <el-icon><Connection /></el-icon>
-          <span>网络管理</span>
+          <template #title>网络管理</template>
         </el-menu-item>
       </el-menu>
     </el-aside>
 
     <el-container>
-      <el-header height="60px">
-        <div class="header-content">
-          <div class="host-info">
-            <h2>{{ hostName }}</h2>
-            <el-tag
-              :type="hostStatus === 'connected' ? 'success' : 'danger'"
-              size="small"
-            >
-              {{ hostStatus === 'connected' ? '已连接' : '未连接' }}
-            </el-tag>
-          </div>
-          <div class="header-actions">
-            <el-button
-              type="primary"
-              :icon="Refresh"
-              circle
-              @click="handleRefresh"
-            />
-            <el-button
-              :type="hostStatus === 'connected' ? 'danger' : 'success'"
-              :icon="hostStatus === 'connected' ? 'Disconnect' : 'Connection'"
-              circle
-              @click="handleToggleConnection"
-            />
-          </div>
+      <el-header height="60px" class="header">
+        <div class="breadcrumb">
+          <el-breadcrumb>
+            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item>{{ hostName }}</el-breadcrumb-item>
+            <el-breadcrumb-item>{{ getMenuTitle(activeMenu) }}</el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+
+        <div class="header-actions">
+          <el-tag
+            :type="hostStatus === 'connected' ? 'success' : 'danger'"
+            class="status-tag"
+          >
+            {{ hostStatus === 'connected' ? '已连接' : '未连接' }}
+          </el-tag>
+          <el-button
+            type="primary"
+            :icon="Refresh"
+            circle
+            @click="handleRefresh"
+          />
+          <el-button
+            :type="hostStatus === 'connected' ? 'danger' : 'success'"
+            :icon="hostStatus === 'connected' ? 'Disconnect' : 'Connection'"
+            circle
+            @click="handleToggleConnection"
+          />
         </div>
       </el-header>
 
@@ -68,97 +79,65 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Monitor, Picture, Files, Connection, Refresh } from '@element-plus/icons-vue'
+import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import {
+  Monitor,
+  Picture,
+  Files,
+  Connection,
+  Refresh,
+  Expand,
+  Fold
+} from '@element-plus/icons-vue'
 import { useDockerStore } from '../../stores/dockerStore'
-import type { DockerHost } from '../../../types/docker'
 
 const route = useRoute()
-const router = useRouter()
 const dockerStore = useDockerStore()
-
 const hostId = computed(() => route.params.id as string)
+const hostName = computed(() => dockerStore.selectedHost?.name || '')
+const hostStatus = computed(() => dockerStore.selectedHost?.status || 'disconnected')
 const activeMenu = computed(() => route.name as string)
+const isCollapse = ref(false)
 
-// 获取主机信息
-const host = computed(() => dockerStore.hosts.find(h => h.id === hostId.value))
-const hostName = computed(() => host.value?.name || '未知主机')
-const hostStatus = computed(() => host.value?.status || 'disconnected')
-
-// 监听主机状态变化
-watch(hostStatus, (newStatus) => {
-  if (newStatus === 'disconnected') {
-    // 如果主机断开连接，返回主机列表
-    router.push({ name: 'hosts' })
+// 获取菜单标题
+const getMenuTitle = (menu: string) => {
+  const menuMap: Record<string, string> = {
+    containers: '容器管理',
+    images: '镜像管理',
+    volumes: '数据卷',
+    networks: '网络管理'
   }
-})
+  return menuMap[menu] || ''
+}
 
-// 页面加载时检查主机状态
-onMounted(async () => {
-  if (!host.value) {
-    // 如果找不到主机，返回主机列表
-    router.push({ name: 'hosts' })
-    return
-  }
+// 切换侧边栏
+const toggleCollapse = () => {
+  isCollapse.value = !isCollapse.value
+}
 
-  // 设置当前选中的主机ID
-  dockerStore.selectedHostId = hostId.value
-
-  // 如果主机未连接，尝试连接
-  if (host.value.status !== 'connected') {
-    try {
-      await dockerStore.connectHost(hostId.value)
-    } catch (error) {
-      console.error('Failed to connect host:', error)
-      // 连接失败时返回主机列表
-      router.push({ name: 'hosts' })
-      return
-    }
-  }
-
-  // 默认跳转到容器页面
-  if (route.name === 'hostManagement') {
-    await router.push({ name: 'containers', params: { id: hostId.value } })
-    // 加载容器列表
-    await dockerStore.refreshContainers()
-  }
-})
-
-// 刷新当前页面数据
-const handleRefresh = async () => {
-  try {
-    if (route.name === 'containers') {
-      await dockerStore.refreshContainers()
-    } else if (route.name === 'images') {
-      await dockerStore.refreshImages()
-    }
-  } catch (error) {
-    console.error('Failed to refresh:', error)
+// 刷新
+const handleRefresh = () => {
+  if (route.name === 'containers') {
+    dockerStore.refreshContainers()
+  } else if (route.name === 'images') {
+    dockerStore.refreshImages()
   }
 }
 
-// 连接/断开主机
-const handleToggleConnection = async () => {
-  if (!host.value) return
-
-  try {
-    if (hostStatus.value === 'connected') {
-      await dockerStore.disconnectHost(hostId.value)
-      // 断开连接后返回主机列表
-      router.push({ name: 'hosts' })
-    } else {
-      dockerStore.selectedHostId = hostId.value
-      await dockerStore.connectHost(hostId.value)
-      // 连接成功后刷新数据
-      await handleRefresh()
-    }
-  } catch (error) {
-    console.error('Failed to toggle connection:', error)
+// 连接/断开连接
+const handleToggleConnection = () => {
+  if (hostStatus.value === 'connected') {
+    dockerStore.disconnectHost(hostId.value)
+  } else {
+    handleConnect()
   }
 }
 
-const handleConnect = () => handleToggleConnection()
+// 连接主机
+const handleConnect = () => {
+  dockerStore.connectHost(hostId.value)
+}
 </script>
 
 <style scoped>
@@ -166,37 +145,58 @@ const handleConnect = () => handleToggleConnection()
   height: 100%;
 }
 
-.host-menu {
-  height: 100%;
-  border-right: none;
+.sidebar {
+  background-color: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color-light);
+  transition: width 0.3s;
 }
 
-.header-content {
-  height: 100%;
+.sidebar-header {
+  height: 60px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  padding: 0 12px;
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
-.host-info {
+.collapse-button {
+  padding: 8px;
+}
+
+.host-menu {
+  border-right: none;
+}
+
+.header {
+  background-color: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+}
+
+.header-actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.host-info h2 {
-  margin: 0;
-  font-size: 18px;
+.status-tag {
+  margin-right: 8px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 8px;
+:deep(.el-menu) {
+  --el-menu-hover-bg-color: var(--el-color-primary-light-9);
 }
 
-.el-main {
-  padding: 20px;
-  background-color: var(--el-bg-color-page);
+:deep(.el-menu-item.is-active) {
+  background-color: var(--el-color-primary-light-9);
 }
 </style> 

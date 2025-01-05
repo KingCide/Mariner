@@ -7,6 +7,12 @@
         <span class="title-text">Mariner</span>
       </div>
       <div class="window-controls">
+        <el-button
+          class="control-button settings-button"
+          @click="showSettings"
+        >
+          <el-icon><Setting /></el-icon>
+        </el-button>
         <button class="control-button" @click="minimizeWindow">
           <el-icon><Minus /></el-icon>
         </button>
@@ -25,14 +31,19 @@
         <router-view />
       </el-main>
     </el-container>
+
+    <!-- 设置对话框 -->
+    <settings-dialog ref="settingsDialogRef" />
   </el-container>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Close, Minus, FullScreen } from '@element-plus/icons-vue'
+import { Close, Minus, FullScreen, Setting } from '@element-plus/icons-vue'
+import SettingsDialog from '../components/settings/SettingsDialog.vue'
 
 const isMaximized = ref(false)
+const settingsDialogRef = ref()
 
 // 窗口控制函数
 const minimizeWindow = () => {
@@ -45,6 +56,10 @@ const toggleMaximize = () => {
 
 const closeWindow = () => {
   window.electron.ipcRenderer.send('window:close')
+}
+
+const showSettings = () => {
+  settingsDialogRef.value?.open()
 }
 
 // 监听窗口状态变化
@@ -127,6 +142,10 @@ onUnmounted(() => {
 .control-button.close:hover {
   background-color: #f56c6c;
   color: white;
+}
+
+.settings-button {
+  padding: 0;
 }
 
 .main-container {

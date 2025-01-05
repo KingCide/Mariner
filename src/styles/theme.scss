@@ -1,0 +1,54 @@
+// Berry Dashboard inspired theme variables
+:root {
+  // Primary Colors
+  --primary-main: #5e35b1;
+  --primary-light: #7c4dff;
+  --primary-dark: #4527a0;
+  
+  // Secondary Colors
+  --secondary-light: #e3f2fd;
+  --secondary-main: #2196f3;
+  --secondary-dark: #1e88e5;
+  
+  // Background Colors
+  --background-default: #f8f9fa;
+  --background-paper: #ffffff;
+  
+  // Text Colors
+  --text-primary: #212121;
+  --text-secondary: #616161;
+  --text-hint: #9e9e9e;
+  
+  // Border and Shadow
+  --border-color: #f0f0f0;
+  --card-shadow: 0 2px 14px 0 rgba(32, 40, 45, 0.08);
+  --card-shadow-hover: 0 4px 18px 0 rgba(32, 40, 45, 0.12);
+  
+  // Spacing
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+}
+
+// Mixins
+@mixin card-hover {
+  transition: all 0.3s ease;
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--card-shadow-hover);
+  }
+}
+
+@mixin gradient-text {
+  background: linear-gradient(45deg, var(--primary-main), var(--secondary-main));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+} 

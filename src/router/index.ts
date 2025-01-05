@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
+import Welcome from '../views/Welcome.vue'
 import HostList from '../components/docker/HostList.vue'
 import HostManagement from '../views/host/HostManagement.vue'
 
@@ -12,11 +13,7 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: '/hosts'
-        },
-        {
-          path: 'hosts',
-          name: 'hosts',
+          name: 'home',
           component: HostList
         },
         {
