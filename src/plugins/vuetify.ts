@@ -15,13 +15,44 @@ export default createVuetify({
       mdi,
     },
   },
+  defaults: {
+    VTextField: {
+      color: 'secondary',
+      variant: 'outlined',
+      density: 'compact',
+    },
+    VTextarea: {
+      color: 'secondary',
+      variant: 'outlined',
+      density: 'compact',
+    },
+    VSelect: {
+      color: 'secondary',
+      variant: 'outlined',
+      density: 'compact',
+    }
+  },
   theme: {
     defaultTheme: 'light',
     themes: {
       light: {
         colors: {
-          primary: '#5e35b1',
+          primary: '#673ab7',
           secondary: '#2196f3',
+          'primary-darken-1': '#5e35b1',
+          'secondary-darken-1': '#1976d2',
+          background: '#ffffff',
+          surface: '#f5f5f5',
+        }
+      },
+      dark: {
+        colors: {
+          primary: '#9575cd',
+          secondary: '#64b5f6',
+          'primary-darken-1': '#7e57c2',
+          'secondary-darken-1': '#42a5f5',
+          background: '#121212',
+          surface: '#1e1e1e',
         }
       }
     }

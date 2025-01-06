@@ -3,7 +3,7 @@
     <!-- 欢迎界面 -->
     <div v-if="hosts.length === 0" class="welcome-container">
       <div class="welcome-content">
-        <img src="../../assets/logo.png" alt="Logo" class="welcome-logo" />
+        <img src="../../assets/logo2.jpg" alt="Logo" class="welcome-logo" />
         <h1 class="welcome-title">Mariner</h1>
         <p class="welcome-subtitle">Docker 容器管理工具</p>
         

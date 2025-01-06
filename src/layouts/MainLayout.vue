@@ -79,7 +79,7 @@ const closeWindow = () => {
 }
 
 const showSettings = () => {
-  settingsDialogRef.value?.open()
+  settingsDialogRef.value?.show()
 }
 
 // 监听窗口状态变化

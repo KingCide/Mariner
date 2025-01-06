@@ -3,11 +3,11 @@
     v-model="visible"
     width="680"
     persistent
-    @update:model-value="handleClosed"
+    @update:model-value="handleClose"
   >
     <v-card class="settings-dialog" elevation="0">
       <v-card-title class="px-4 py-3 bg-primary d-flex align-center">
-        <span class="text-h6 font-weight-medium text-white">设置</span>
+        <span class="text-h6 font-weight-medium text-white">{{ $t('settings.title') }}</span>
         <v-spacer></v-spacer>
         <v-btn
           icon="mdi-close"
@@ -27,7 +27,7 @@
         >
           <v-tab value="general" class="text-body-1">
             <v-icon start size="small">mdi-cog-outline</v-icon>
-            常规
+            {{ $t('settings.general.title') }}
           </v-tab>
           <v-tab value="docker" class="text-body-1">
             <v-icon start size="small">mdi-docker</v-icon>
@@ -35,11 +35,11 @@
           </v-tab>
           <v-tab value="terminal" class="text-body-1">
             <v-icon start size="small">mdi-console</v-icon>
-            终端
+            {{ $t('settings.terminal.title') }}
           </v-tab>
           <v-tab value="proxy" class="text-body-1">
             <v-icon start size="small">mdi-web</v-icon>
-            代理
+            {{ $t('settings.proxy.title') }}
           </v-tab>
         </v-tabs>
 
@@ -47,8 +47,8 @@
           <!-- 常规设置 -->
           <v-window-item value="general">
             <v-card flat class="rounded-lg pa-3 bg-grey-lighten-5">
-              <v-form ref="generalFormRef" v-model:valid="generalFormValid">
-                <div class="text-subtitle-1 font-weight-medium mb-2">主题</div>
+              <v-form ref="generalFormRef">
+                <div class="text-subtitle-1 font-weight-medium mb-2">{{ $t('settings.general.theme') }}</div>
                 <v-card-text class="pa-2 bg-white rounded-lg mb-3">
                   <v-btn-toggle
                     v-model="generalForm.theme"
@@ -59,22 +59,22 @@
                   >
                     <v-btn value="light" class="flex-1">
                       <v-icon start size="small">mdi-white-balance-sunny</v-icon>
-                      浅色
+                      {{ $t('settings.general.light') }}
                     </v-btn>
                     <v-btn value="dark" class="flex-1">
                       <v-icon start size="small">mdi-moon-waning-crescent</v-icon>
-                      深色
+                      {{ $t('settings.general.dark') }}
                     </v-btn>
                     <v-btn value="system" class="flex-1">
                       <v-icon start size="small">mdi-desktop-mac</v-icon>
-                      跟随系统
+                      {{ $t('settings.general.system') }}
                     </v-btn>
                   </v-btn-toggle>
                 </v-card-text>
 
                 <v-select
                   v-model="generalForm.language"
-                  label="语言"
+                  :label="$t('settings.general.language')"
                   :items="[
                     { title: '简体中文', value: 'zh-CN' },
                     { title: 'English', value: 'en-US' }
@@ -88,7 +88,7 @@
                 <v-card flat class="rounded-lg pa-3 bg-white">
                   <v-switch
                     v-model="generalForm.autoUpdate"
-                    label="自动检查更新"
+                    :label="$t('settings.general.autoUpdate')"
                     color="primary"
                     hide-details
                     density="compact"
@@ -96,7 +96,7 @@
                   ></v-switch>
                   <v-switch
                     v-model="generalForm.autoStart"
-                    label="开机自启"
+                    :label="$t('settings.general.autoStart')"
                     color="primary"
                     hide-details
                     density="compact"
@@ -109,10 +109,10 @@
           <!-- Docker 设置 -->
           <v-window-item value="docker">
             <v-card flat class="rounded-lg pa-3 bg-grey-lighten-5">
-              <v-form ref="dockerFormRef" v-model:valid="dockerFormValid">
+              <v-form ref="dockerFormRef">
                 <v-select
                   v-model="dockerForm.defaultRegistry"
-                  label="默认镜像仓库"
+                  :label="$t('settings.docker.registry')"
                   :items="[
                     { title: 'Docker Hub', value: 'docker.io' },
                     { title: '阿里云', value: 'registry.cn-hangzhou.aliyuncs.com' },
@@ -125,23 +125,23 @@
                 ></v-select>
 
                 <v-card flat class="rounded-lg pa-3 bg-white mb-3">
-                  <div class="text-subtitle-1 font-weight-medium mb-2">镜像拉取策略</div>
+                  <div class="text-subtitle-1 font-weight-medium mb-2">{{ $t('settings.docker.pullPolicy') }}</div>
                   <v-radio-group 
                     v-model="dockerForm.pullPolicy" 
                     class="ml-2"
                     density="compact"
                     hide-details
                   >
-                    <v-radio label="总是拉取" value="always" color="primary"></v-radio>
-                    <v-radio label="不存在时拉取" value="ifnotpresent" color="primary"></v-radio>
-                    <v-radio label="从不拉取" value="never" color="primary"></v-radio>
+                    <v-radio :label="$t('settings.docker.always')" value="always" color="primary"></v-radio>
+                    <v-radio :label="$t('settings.docker.ifnotpresent')" value="ifnotpresent" color="primary"></v-radio>
+                    <v-radio :label="$t('settings.docker.never')" value="never" color="primary"></v-radio>
                   </v-radio-group>
                 </v-card>
 
                 <div class="d-flex gap-3">
                   <v-text-field
                     v-model="dockerForm.logMaxSize"
-                    label="容器日志大小"
+                    :label="$t('settings.docker.logMaxSize')"
                     type="number"
                     min="10"
                     max="1000"
@@ -155,7 +155,7 @@
 
                   <v-text-field
                     v-model="dockerForm.logMaxFiles"
-                    label="日志文件数量"
+                    :label="$t('settings.docker.logMaxFiles')"
                     type="number"
                     min="1"
                     max="100"
@@ -173,11 +173,11 @@
           <!-- 终端设置 -->
           <v-window-item value="terminal">
             <v-card flat class="rounded-lg pa-3 bg-grey-lighten-5">
-              <v-form ref="terminalFormRef" v-model:valid="terminalFormValid">
+              <v-form ref="terminalFormRef">
                 <div class="d-flex gap-3 mb-3">
                   <v-select
                     v-model="terminalForm.fontFamily"
-                    label="字体"
+                    :label="$t('settings.terminal.fontFamily')"
                     :items="[
                       { title: 'Menlo', value: 'Menlo' },
                       { title: 'Monaco', value: 'Monaco' },
@@ -192,7 +192,7 @@
 
                   <v-text-field
                     v-model="terminalForm.fontSize"
-                    label="字体大小"
+                    :label="$t('settings.terminal.fontSize')"
                     type="number"
                     min="8"
                     max="32"
@@ -208,7 +208,7 @@
                 <div class="d-flex gap-3 mb-3">
                   <v-text-field
                     v-model="terminalForm.lineHeight"
-                    label="行高"
+                    :label="$t('settings.terminal.lineHeight')"
                     type="number"
                     min="1"
                     max="2"
@@ -221,11 +221,11 @@
 
                   <v-select
                     v-model="terminalForm.cursorStyle"
-                    label="光标样式"
+                    :label="$t('settings.terminal.cursorStyle')"
                     :items="[
-                      { title: '块状', value: 'block' },
-                      { title: '下划线', value: 'underline' },
-                      { title: '竖线', value: 'bar' }
+                      { title: $t('settings.terminal.block'), value: 'block' },
+                      { title: $t('settings.terminal.underline'), value: 'underline' },
+                      { title: $t('settings.terminal.bar'), value: 'bar' }
                     ]"
                     variant="outlined"
                     density="compact"
@@ -237,7 +237,7 @@
                 <v-card flat class="rounded-lg pa-3 bg-white">
                   <v-switch
                     v-model="terminalForm.cursorBlink"
-                    label="光标闪烁"
+                    :label="$t('settings.terminal.cursorBlink')"
                     color="primary"
                     hide-details
                     density="compact"
@@ -250,11 +250,11 @@
           <!-- 代理设置 -->
           <v-window-item value="proxy">
             <v-card flat class="rounded-lg pa-3 bg-grey-lighten-5">
-              <v-form ref="proxyFormRef" v-model:valid="proxyFormValid">
+              <v-form ref="proxyFormRef">
                 <v-card flat class="rounded-lg pa-3 bg-white mb-3">
                   <v-switch
                     v-model="proxyForm.enabled"
-                    label="启用代理"
+                    :label="$t('settings.proxy.enabled')"
                     color="primary"
                     hide-details
                     density="compact"
@@ -266,8 +266,8 @@
                     <div class="d-flex gap-3">
                       <v-text-field
                         v-model="proxyForm.host"
-                        label="代理服务器"
-                        placeholder="例如：127.0.0.1"
+                        :label="$t('settings.proxy.host')"
+                        :placeholder="$t('settings.proxy.hostPlaceholder')"
                         variant="outlined"
                         density="compact"
                         class="rounded-lg flex-grow-1"
@@ -276,7 +276,7 @@
 
                       <v-text-field
                         v-model="proxyForm.port"
-                        label="端口"
+                        :label="$t('settings.proxy.port')"
                         type="number"
                         min="1"
                         max="65535"
@@ -292,8 +292,8 @@
                     <div class="d-flex gap-3">
                       <v-text-field
                         v-model="proxyForm.username"
-                        label="用户名"
-                        placeholder="可选"
+                        :label="$t('settings.proxy.username')"
+                        :placeholder="$t('settings.proxy.usernamePlaceholder')"
                         variant="outlined"
                         density="compact"
                         class="rounded-lg"
@@ -302,8 +302,8 @@
 
                       <v-text-field
                         v-model="proxyForm.password"
-                        label="密码"
-                        placeholder="可选"
+                        :label="$t('settings.proxy.password')"
+                        :placeholder="$t('settings.proxy.passwordPlaceholder')"
                         variant="outlined"
                         density="compact"
                         class="rounded-lg"
@@ -316,8 +316,8 @@
 
                     <v-textarea
                       v-model="proxyForm.noProxy"
-                      label="不使用代理"
-                      placeholder="每行一个地址，支持通配符 *"
+                      :label="$t('settings.proxy.noProxy')"
+                      :placeholder="$t('settings.proxy.noProxyPlaceholder')"
                       rows="3"
                       variant="outlined"
                       density="compact"
@@ -334,24 +334,20 @@
 
       <v-divider></v-divider>
 
-      <v-card-actions class="pa-4">
+      <v-card-actions class="pa-4 pt-0">
         <v-spacer></v-spacer>
         <v-btn
-          variant="tonal"
-          color="primary"
-          class="px-6 text-none rounded-lg"
-          @click="handleSave"
-          :loading="saving"
-        >
-          保存
-        </v-btn>
-        <v-btn
-          variant="outlined"
-          color="default"
-          class="px-6 text-none rounded-lg ml-3"
+          variant="text"
           @click="visible = false"
         >
-          取消
+          {{ $t('common.cancel') }}
+        </v-btn>
+        <v-btn
+          color="primary"
+          :loading="saving"
+          @click="handleSave"
+        >
+          {{ $t('common.save') }}
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -359,43 +355,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useSettingsStore } from '../../stores/settingsStore'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useTheme } from 'vuetify'
+import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '@/stores/settingsStore'
 
-const settingsStore = useSettingsStore()
 const visible = ref(false)
 const activeTab = ref('general')
 const saving = ref(false)
 const showPassword = ref(false)
 
-// 表单引用
-const generalFormRef = ref()
-const dockerFormRef = ref()
-const terminalFormRef = ref()
-const proxyFormRef = ref()
-
-// 表单验证状态
-const generalFormValid = ref(true)
-const dockerFormValid = ref(true)
-const terminalFormValid = ref(true)
-const proxyFormValid = ref(true)
+const theme = useTheme()
+const { locale } = useI18n()
+const settingsStore = useSettingsStore()
 
 // 表单数据
-const generalForm = reactive({
-  theme: 'system' as 'system' | 'light' | 'dark',
+const generalForm = ref({
+  theme: 'light' as 'light' | 'dark' | 'system',
   language: 'zh-CN',
   autoUpdate: true,
   autoStart: false
 })
 
-const dockerForm = reactive({
+const dockerForm = ref({
   defaultRegistry: 'docker.io',
   pullPolicy: 'ifnotpresent' as 'ifnotpresent' | 'always' | 'never',
   logMaxSize: 100,
   logMaxFiles: 3
 })
 
-const terminalForm = reactive({
+const terminalForm = ref({
   fontFamily: 'Menlo',
   fontSize: 14,
   lineHeight: 1.2,
@@ -403,7 +392,7 @@ const terminalForm = reactive({
   cursorBlink: true
 })
 
-const proxyForm = reactive({
+const proxyForm = ref({
   enabled: false,
   host: '',
   port: 1080,
@@ -412,38 +401,65 @@ const proxyForm = reactive({
   noProxy: ''
 })
 
-// 打开对话框
-const open = () => {
-  visible.value = true
-  // 加载设置
-  const settings = settingsStore.settings
-  Object.assign(generalForm, settings.general)
-  Object.assign(dockerForm, settings.docker)
-  Object.assign(terminalForm, settings.terminal)
-  Object.assign(proxyForm, settings.proxy)
-}
+// 监听主题变化
+watch(() => generalForm.value.theme, (newTheme) => {
+  if (newTheme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    theme.global.name.value = prefersDark ? 'dark' : 'light'
+  } else {
+    theme.global.name.value = newTheme
+  }
+})
+
+// 监听语言变化
+watch(() => generalForm.value.language, (newLanguage) => {
+  locale.value = newLanguage
+})
+
+// 监听系统主题变化
+onMounted(() => {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  const handleChange = (e: MediaQueryListEvent) => {
+    if (generalForm.value.theme === 'system') {
+      theme.global.name.value = e.matches ? 'dark' : 'light'
+    }
+  }
+  mediaQuery.addEventListener('change', handleChange)
+  onUnmounted(() => {
+    mediaQuery.removeEventListener('change', handleChange)
+  })
+})
 
 // 关闭对话框时重置表单
-const handleClosed = (val: boolean) => {
+const handleClose = (val: boolean) => {
   if (!val) {
     activeTab.value = 'general'
-    generalFormRef.value?.reset()
-    dockerFormRef.value?.reset()
-    terminalFormRef.value?.reset()
-    proxyFormRef.value?.reset()
+    // 重置表单数据
+    const settings = settingsStore.settings
+    Object.assign(generalForm.value, settings.general)
+    Object.assign(dockerForm.value, settings.docker)
+    Object.assign(terminalForm.value, settings.terminal)
+    Object.assign(proxyForm.value, settings.proxy)
   }
 }
 
-// 保存设置
 const handleSave = async () => {
   saving.value = true
   try {
     await settingsStore.saveSettings({
-      general: { ...generalForm },
-      docker: { ...dockerForm },
-      terminal: { ...terminalForm },
-      proxy: { ...proxyForm }
+      general: { ...generalForm.value },
+      docker: { ...dockerForm.value },
+      terminal: { ...terminalForm.value },
+      proxy: { ...proxyForm.value }
     })
+    // 应用主题和语言设置
+    if (generalForm.value.theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      theme.global.name.value = prefersDark ? 'dark' : 'light'
+    } else {
+      theme.global.name.value = generalForm.value.theme
+    }
+    locale.value = generalForm.value.language
     visible.value = false
   } catch (error) {
     console.error('Failed to save settings:', error)
@@ -453,34 +469,20 @@ const handleSave = async () => {
 }
 
 defineExpose({
-  open
+  show: () => {
+    visible.value = true
+    // 加载设置
+    const settings = settingsStore.settings
+    Object.assign(generalForm.value, settings.general)
+    Object.assign(dockerForm.value, settings.docker)
+    Object.assign(terminalForm.value, settings.terminal)
+    Object.assign(proxyForm.value, settings.proxy)
+  }
 })
 </script>
 
 <style scoped>
-.settings-dialog {
-  border-radius: 12px;
-  overflow: hidden;
-}
-
 .flex-1 {
   flex: 1;
-}
-
-:deep(.v-field) {
-  border-radius: 8px !important;
-}
-
-:deep(.v-input) {
-  --v-input-control-height: 40px;
-}
-
-:deep(.v-btn) {
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-.gap-3 {
-  gap: 12px;
 }
 </style> 

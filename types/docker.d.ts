@@ -6,11 +6,13 @@ export interface DockerHost {
   config: {
     host?: string
     port?: number
+    dockerPort?: number
     socketPath?: string
     certPath?: string
     sshConfig?: {
       username: string
       privateKey?: string
+      privateKeyPath?: string
       passphrase?: string
       password?: string
     }

@@ -1,93 +1,159 @@
 <template>
-  <el-form
+  <v-form
     ref="formRef"
-    :model="form"
-    :rules="rules"
-    label-width="120px"
+    v-model="valid"
     class="ssh-config-form"
   >
-    <el-form-item label="主机名称" prop="name">
-      <el-input v-model="form.name" placeholder="请输入主机名称" />
-    </el-form-item>
+    <v-row dense>
+      <!-- 主机名称和地址 -->
+      <v-col cols="12" sm="6">
+        <v-text-field
+          v-model="form.name"
+          label="主机名称"
+          variant="outlined"
+          density="compact"
+          :rules="nameRules"
+          placeholder="请自定义主机名称"
+        ></v-text-field>
+      </v-col>
 
-    <el-form-item label="主机地址" prop="host">
-      <el-input v-model="form.host" placeholder="请输入主机IP或域名" />
-    </el-form-item>
+      <v-col cols="12" sm="6">
+        <v-text-field
+          v-model="form.host"
+          label="主机地址"
+          variant="outlined"
+          density="compact"
+          :rules="hostRules"
+          placeholder="请输入主机IP或域名"
+        ></v-text-field>
+      </v-col>
 
-    <el-form-item label="SSH端口" prop="port">
-      <el-input-number v-model="form.port" :min="1" :max="65535" :step="1" />
-    </el-form-item>
+      <!-- 端口和用户名 -->
+      <v-col cols="12" sm="6">
+        <v-text-field
+          v-model.number="form.port"
+          label="SSH端口"
+          type="number"
+          variant="outlined"
+          density="compact"
+          hint="默认为22"
+          :rules="portRules"
+        ></v-text-field>
+      </v-col>
 
-    <el-form-item label="用户名" prop="username">
-      <el-input v-model="form.username" placeholder="请输入SSH用户名" />
-    </el-form-item>
+      <v-col cols="12" sm="6">
+        <v-text-field
+          v-model="form.username"
+          label="用户名"
+          variant="outlined"
+          density="compact"
+          :rules="usernameRules"
+          placeholder="请输入SSH用户名"
+        ></v-text-field>
+      </v-col>
 
-    <el-form-item label="认证方式" prop="authType">
-      <el-radio-group v-model="form.authType">
-        <el-radio label="privateKey">私钥</el-radio>
-        <el-radio label="password">密码</el-radio>
-      </el-radio-group>
-    </el-form-item>
+      <!-- 认证方式选择 -->
+      <v-col cols="12">
+        <v-radio-group
+          v-model="form.authType"
+          inline
+          density="compact"
+        >
+          <v-radio value="password" label="密码"></v-radio>  
+          <v-radio value="privateKey" label="私钥"></v-radio>
+        </v-radio-group>
+      </v-col>
 
-    <template v-if="form.authType === 'privateKey'">
-      <el-form-item label="私钥文件" prop="privateKey">
-        <div class="private-key-input">
-          <el-input
+      <!-- 私钥认证相关字段 -->
+      <template v-if="form.authType === 'privateKey'">
+        <v-col cols="12" sm="6">
+          <v-text-field
             v-model="form.privateKeyPath"
-            placeholder="请选择私钥文件"
+            label="私钥文件"
+            variant="outlined"
+            density="compact"
             readonly
-          >
-            <template #append>
-              <el-button @click="selectPrivateKey">选择文件</el-button>
-            </template>
-          </el-input>
-        </div>
-      </el-form-item>
+            append-inner-icon="mdi-folder"
+            @click:append-inner="selectPrivateKey"
+            :rules="privateKeyRules"
+          ></v-text-field>
+        </v-col>
 
-      <el-form-item label="密码短语" prop="passphrase">
-        <el-input
-          v-model="form.passphrase"
-          type="password"
-          placeholder="如果私钥有密码保护，请输入密码短语"
-          show-password
-        />
-      </el-form-item>
-    </template>
+        <v-col cols="12" sm="6">
+          <v-text-field
+            v-model="form.passphrase"
+            label="密码短语"
+            variant="outlined"
+            density="compact"
+            placeholder="私钥有密码保护时输入"
+            :type="showPassphrase ? 'text' : 'password'"
+            :append-inner-icon="showPassphrase ? 'mdi-eye-off' : 'mdi-eye'"
+            @click:append-inner="showPassphrase = !showPassphrase"
+          ></v-text-field>
+        </v-col>
+      </template>
 
-    <template v-else>
-      <el-form-item label="密码" prop="password">
-        <el-input
-          v-model="form.password"
-          type="password"
-          placeholder="请输入SSH密码"
-          show-password
-        />
-      </el-form-item>
-    </template>
+      <!-- 密码认证相关字段 -->
+      <template v-else>
+        <v-col cols="12">
+          <v-text-field
+            v-model="form.password"
+            label="密码"
+            variant="outlined"
+            density="compact"
+            :type="showPassword ? 'text' : 'password'"
+            :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+            @click:append-inner="showPassword = !showPassword"
+            :rules="passwordRules"
+          ></v-text-field>
+        </v-col>
+      </template>
 
-    <el-form-item label="Docker端口" prop="dockerPort">
-      <el-input-number
-        v-model="form.dockerPort"
-        :min="1"
-        :max="65535"
-        :step="1"
-      />
-      <div class="form-tip">
-        远程Docker守护进程的端口，默认为2375
-      </div>
-    </el-form-item>
+      <!-- Docker端口 -->
+      <v-col cols="12" sm="6">
+        <v-text-field
+          v-model.number="form.dockerPort"
+          label="Docker端口"
+          type="number"
+          variant="outlined"
+          density="compact"
+          hint="默认为2375"
+          :rules="dockerPortRules"
+        ></v-text-field>
+      </v-col>
 
-    <el-form-item>
-      <el-button type="primary" @click="handleTest">测试连接</el-button>
-      <el-button @click="handleSubmit">保存</el-button>
-    </el-form-item>
-  </el-form>
+      <!-- 操作按钮 -->
+      <v-col cols="12" class="d-flex justify-end">
+        <v-btn
+          color="primary"
+          class="mr-4"
+          @click="handleTest"
+        >
+          测试连接
+        </v-btn>
+        <v-btn
+          @click="handleSubmit"
+        >
+          保存
+        </v-btn>
+      </v-col>
+    </v-row>
+  </v-form>
+
+  <!-- 添加 snackbar -->
+  <v-snackbar
+    v-model="snackbar.show"
+    :color="snackbar.color"
+    :timeout="3000"
+    location="top"
+  >
+    {{ snackbar.text }}
+  </v-snackbar>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { VForm } from 'vuetify/components'
 import { useDockerStore } from '../../stores/dockerStore'
 import { DockerService } from '../../services/docker'
 import type { DockerHost } from '../../../types/docker'
@@ -95,13 +161,13 @@ import type { DockerHost } from '../../../types/docker'
 const dockerService = new DockerService()
 const dockerStore = useDockerStore()
 
-const formRef = ref<FormInstance>()
+const formRef = ref<VForm>()
 const form = reactive({
   name: '',
   host: '',
   port: 22,
   username: '',
-  authType: 'privateKey',
+  authType: 'password',
   privateKey: '',
   privateKeyPath: '',
   passphrase: '',
@@ -109,32 +175,37 @@ const form = reactive({
   dockerPort: 2375
 })
 
-const rules: FormRules = {
-  name: [
-    { required: true, message: '请输入主机名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
-  ],
-  host: [
-    { required: true, message: '请输入主机地址', trigger: 'blur' }
-  ],
-  port: [
-    { required: true, message: '请输入SSH端口', trigger: 'blur' },
-    { type: 'number', min: 1, max: 65535, message: '端口范围在1-65535之间', trigger: 'blur' }
-  ],
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
-  ],
-  privateKey: [
-    { required: true, message: '请选择私钥文件', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' }
-  ],
-  dockerPort: [
-    { required: true, message: '请输入Docker端口', trigger: 'blur' },
-    { type: 'number', min: 1, max: 65535, message: '端口范围在1-65535之间', trigger: 'blur' }
-  ]
-}
+// 删除 FormRules 类型声明，直接定义验证规则
+const nameRules = [
+  (v: string) => !!v || '请输入主机名称',
+  (v: string) => (v && v.length >= 2 && v.length <= 50) || '长度在 2 到 50 个字符'
+]
+
+const hostRules = [
+  (v: string) => !!v || '请输入主机地址'
+]
+
+const portRules = [
+  (v: number) => !!v || '请输入端口号',
+  (v: number) => (v >= 1 && v <= 65535) || '端口范围在1-65535之间'
+]
+
+const usernameRules = [
+  (v: string) => !!v || '请输入用户名'
+]
+
+const privateKeyRules = [
+  (v: string) => !!v || '请选择私钥文件'
+]
+
+const passwordRules = [
+  (v: string) => !!v || '请输入密码'
+]
+
+const dockerPortRules = [
+  (v: number) => !!v || '请输入Docker端口',
+  (v: number) => (v >= 1 && v <= 65535) || '端口范围在1-65535之间'
+]
 
 const selectPrivateKey = async () => {
   try {
@@ -154,15 +225,27 @@ const selectPrivateKey = async () => {
       form.privateKey = privateKey
     }
   } catch (error) {
-    ElMessage.error('选择私钥文件失败')
+    showMessage('选择私钥文件失败')
   }
+}
+
+const snackbar = reactive({
+  show: false,
+  text: '',
+  color: 'success'
+})
+
+const showMessage = (text: string, color: 'success' | 'error' = 'success') => {
+  snackbar.text = text
+  snackbar.color = color
+  snackbar.show = true
 }
 
 const handleTest = async () => {
   try {
-    const valid = await formRef.value?.validate()
+    const { valid } = await formRef.value?.validate() || { valid: false }
     if (!valid) return
-
+    
     const host: DockerHost = {
       id: '', // 临时ID，实际保存时会生成
       name: form.name,
@@ -188,18 +271,18 @@ const handleTest = async () => {
 
     const isConnected = await dockerService.testSSHConnection(host)
     if (isConnected) {
-      ElMessage.success('连接测试成功')
+      showMessage('连接测试成功')
     }
   } catch (error) {
-    ElMessage.error(`连接测试失败: ${(error as Error).message}`)
+    showMessage(`连接测试失败: ${(error as Error).message}`, 'error')
   }
 }
 
 const handleSubmit = async () => {
   try {
-    const valid = await formRef.value?.validate()
+    const { valid } = await formRef.value?.validate() || { valid: false }
     if (!valid) return
-
+    
     const host: Omit<DockerHost, 'id' | 'status'> = {
       name: form.name,
       connectionType: 'ssh',
@@ -222,33 +305,26 @@ const handleSubmit = async () => {
     }
 
     await dockerStore.addHost(host)
-    ElMessage.success('保存成功')
+    showMessage('保存成功')
     emit('saved')
   } catch (error) {
-    ElMessage.error(`保存失败: ${(error as Error).message}`)
+    showMessage(`保存失败: ${(error as Error).message}`, 'error')
   }
 }
 
 const emit = defineEmits<{
   (event: 'saved'): void
 }>()
+
+const valid = ref(false)
+const showPassword = ref(false)
+const showPassphrase = ref(false)
 </script>
 
 <style scoped>
 .ssh-config-form {
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 20px;
-}
-
-.private-key-input {
-  display: flex;
-  align-items: center;
-}
-
-.form-tip {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
 }
 </style> 
