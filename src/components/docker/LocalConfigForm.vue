@@ -1,58 +1,83 @@
 <template>
-  <el-form
+  <v-form
     ref="formRef"
-    :model="form"
-    :rules="rules"
-    label-width="120px"
+    v-model="valid"
     class="local-config-form"
   >
-    <el-form-item label="主机名称" prop="name">
-      <el-input v-model="form.name" placeholder="请输入主机名称" />
-    </el-form-item>
+    <v-row dense>
+      <!-- 主机名称 -->
+      <v-col cols="12" sm="6">
+        <v-text-field
+          v-model="form.name"
+          label="主机名称"
+          variant="outlined"
+          density="compact"
+          :rules="nameRules"
+          placeholder="请输入主机名称"
+        ></v-text-field>
+      </v-col>
 
-    <el-alert
-      v-if="localDockerAvailable"
-      type="success"
-      :closable="false"
-      show-icon
-    >
-      检测到本地 Docker 可用
-    </el-alert>
-    <el-alert
-      v-else
-      type="error"
-      :closable="false"
-      show-icon
-    >
-      未检测到本地 Docker，请确保 Docker 已安装并运行
-    </el-alert>
+      <!-- Docker状态提示 -->
+      <v-col cols="12">
+        <v-alert
+          :type="localDockerAvailable ? 'success' : 'error'"
+          variant="tonal"
+          :text="localDockerAvailable ? '检测到本地 Docker 可用' : '未检测到本地 Docker，请确保 Docker 已安装并运行'"
+        ></v-alert>
+      </v-col>
 
-    <el-form-item>
-      <el-button @click="handleSubmit" :disabled="!localDockerAvailable">保存</el-button>
-    </el-form-item>
-  </el-form>
+      <!-- 操作按钮 -->
+      <v-col cols="12" class="d-flex justify-center">
+        <v-btn
+          @click="handleSubmit"
+          :disabled="!localDockerAvailable"
+        >
+          保存
+        </v-btn>
+      </v-col>
+    </v-row>
+  </v-form>
+
+  <!-- 添加 snackbar -->
+  <v-snackbar
+    v-model="snackbar.show"
+    :color="snackbar.color"
+    :timeout="3000"
+    location="top"
+  >
+    {{ snackbar.text }}
+  </v-snackbar>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { VForm } from 'vuetify/components'
 import { useDockerStore } from '../../stores/dockerStore'
 import type { DockerHost } from '../../../types/docker'
 
 const dockerStore = useDockerStore()
 
-const formRef = ref<FormInstance>()
+const formRef = ref<VForm>()
 const localDockerAvailable = ref(false)
 const form = reactive({
   name: '本地Docker'
 })
 
-const rules: FormRules = {
-  name: [
-    { required: true, message: '请输入主机名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
-  ]
+const nameRules = [
+  (v: string) => !!v || '请输入主机名称',
+  (v: string) => (v && v.length >= 2 && v.length <= 50) || '长度在 2 到 50 个字符'
+]
+
+const snackbar = reactive({
+  show: false,
+  text: '',
+  color: 'success'
+})
+
+const showMessage = (text: string, color: 'success' | 'error' = 'success') => {
+  snackbar.text = text
+  snackbar.color = color
+  snackbar.show = true
 }
 
 const checkLocalDocker = async () => {
@@ -66,7 +91,7 @@ const checkLocalDocker = async () => {
 
 const handleSubmit = async () => {
   try {
-    const valid = await formRef.value?.validate()
+    const { valid } = await formRef.value?.validate() || { valid: false }
     if (!valid) return
 
     const host: Omit<DockerHost, 'id' | 'status'> = {
@@ -76,16 +101,18 @@ const handleSubmit = async () => {
     }
 
     await dockerStore.addHost(host)
-    ElMessage.success('保存成功')
+    showMessage('保存成功')
     emit('saved')
   } catch (error) {
-    ElMessage.error(`保存失败: ${(error as Error).message}`)
+    showMessage(`保存失败: ${(error as Error).message}`, 'error')
   }
 }
 
 const emit = defineEmits<{
   (event: 'saved'): void
 }>()
+
+const valid = ref(false)
 
 onMounted(() => {
   checkLocalDocker()
@@ -94,12 +121,8 @@ onMounted(() => {
 
 <style scoped>
 .local-config-form {
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 20px;
-}
-
-.el-alert {
-  margin: 20px 0;
 }
 </style> 
