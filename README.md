@@ -1,5 +1,5 @@
 # Mariner - Docker 管理工具
-
+![Mariner](./menu.png)
 Mariner 是一个跨平台的 Docker 管理工具，使用 Electron + Vue 3 构建。它提供了直观的图形界面来管理 Docker 容器、镜像和网络。
 
 ## 特性
