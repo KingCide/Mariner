@@ -350,6 +350,31 @@ export const useDockerStore = defineStore('docker', () => {
     }
   }
 
+  // 设置选中主机
+  const setSelectedHost = async (hostId: string) => {
+    try {
+      const host = hosts.value.find(h => h.id === hostId)
+      if (!host) {
+        throw new Error('主机不存在')
+      }
+
+      if (host.status !== 'connected') {
+        // 如果主机未连接，先尝试连接
+        await connectHost(hostId)
+      }
+
+      selectedHostId.value = hostId
+      
+      // 连接成功后刷新数据
+      await Promise.all([
+        refreshContainers(),
+        refreshImages(hostId)
+      ])
+    } catch (error) {
+      throw error
+    }
+  }
+
   return {
     // 状态
     hosts,
@@ -382,7 +407,8 @@ export const useDockerStore = defineStore('docker', () => {
     getContainerStats,
     pullImage,
     exportImage,
-    deleteImage
+    deleteImage,
+    setSelectedHost,
   }
   
 }) 

@@ -1,153 +1,224 @@
 <template>
   <div class="host-list">
-    <!-- 欢迎界面 -->
-    <div v-if="hosts.length === 0" class="welcome-container">
-      <div class="welcome-content">
-        <img src="../../assets/logo2.jpg" alt="Logo" class="welcome-logo" />
-        <h1 class="welcome-title">Mariner</h1>
-        <p class="welcome-subtitle">Docker 容器管理工具</p>
-        
-        <div class="welcome-actions">
-          <el-button
-            type="primary"
-            size="large"
-            class="action-button"
-            @click="handleAddHost"
-          >
-            <el-icon class="button-icon"><Plus /></el-icon>
-            添加主机
-          </el-button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 主机列表 -->
-    <template v-else>
-      <el-row :gutter="16">
-        <el-col v-for="host in hosts" :key="host.id" :span="8">
-          <el-card class="host-card" :class="{ active: host.id === selectedHostId }" @dblclick="handleHostClick(host)">
-            <template #header>
-              <div class="card-header">
-                <el-tag
-                  :type="getStatusType(host.status)"
-                  class="status-tag"
-                  size="small"
-                >
-                  {{ getStatusText(host.status) }}
-                </el-tag>
-                <h3 class="host-name">{{ host.name }}</h3>
-                <el-dropdown trigger="click" @command="handleCommand($event, host)">
-                  <el-button type="text">
-                    <el-icon><More /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="connect">
-                        {{ host.status === 'connected' ? '断开连接' : '连接' }}
-                      </el-dropdown-item>
-                      <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                      <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </div>
-            </template>
-
-            <div class="host-info">
-              <div class="info-item">
-                <span class="label">地址：</span>
-                <span class="value">
-                  {{ host.connectionType === 'local' ? '本地' : `${host.config.host}:${host.config.port}` }}
-                </span>
-              </div>
-              <div class="info-item">
-                <span class="label">类型：</span>
-                <span class="value">{{ getConnectionType(host.connectionType) }}</span>
-              </div>
-              <template v-if="host.status === 'connected' && host.info">
-                <div class="info-item">
-                  <span class="label">版本：</span>
-                  <span class="value">{{ host.info.version }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">系统：</span>
-                  <span class="value">{{ host.info.os }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">内核：</span>
-                  <span class="value">{{ host.info.kernelVersion }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">CPU：</span>
-                  <span class="value">{{ host.info.cpus }} 核</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">内存：</span>
-                  <span class="value">{{ formatBytes(host.info.memory) }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">容器数：</span>
-                  <span class="value">{{ host.info.containers }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="label">镜像数：</span>
-                  <span class="value">{{ host.info.images }}</span>
-                </div>
-              </template>
-            </div>
-          </el-card>
-        </el-col>
-
-        <el-col :span="8">
-          <div
-            class="add-host-card"
-            @click="handleAddHost"
-          >
-            <el-icon><Plus /></el-icon>
-            <span>添加主机</span>
+    <template v-if="hosts.length === 0">
+      <!-- 欢迎界面 -->
+      <div class="welcome-container">
+        <v-card class="welcome-content" elevation="0">
+          <v-img
+            :src="getImageUrl('logo.png')"
+            class="welcome-logo mx-auto"
+            width="170"
+            height="160"
+            cover
+          ></v-img>
+          <h1 class="welcome-title text-h3 font-weight-bold mt-6 gradient-text">Mariner</h1>
+          <p class="welcome-subtitle text-subtitle-1 text-medium-emphasis mt-2">Docker 容器管理工具</p>
+          <div class="welcome-actions mt-8">
+            <v-btn
+              color="primary"
+              size="x-large"
+              prepend-icon="mdi-plus"
+              @click="handleAddHost"
+              class="px-8"
+            >
+              添加主机
+            </v-btn>
           </div>
-        </el-col>
-      </el-row>
+        </v-card>
+      </div>
     </template>
 
+    <template v-else>
+      <!-- 主机列表 -->
+      <v-container fluid>
+        <v-row>
+          <v-col
+            v-for="host in hosts"
+            :key="host.id"
+            cols="12"
+            sm="6"
+            md="4"
+            lg="3"
+          >
+            <v-card
+              :class="['host-card', { 'active': selectedHostId === host.id }]"
+              @click="handleHostClick(host)"
+              elevation="2"
+              :ripple="true"
+            >
+              <v-card-title class="card-header">
+                <span class="host-name">{{ host.name }}</span>
+                <v-chip
+                  :color="getStatusColor(host.status)"
+                  size="small"
+                  class="status-tag"
+                >
+                  {{ getStatusText(host.status) }}
+                </v-chip>
+                <v-menu location="bottom end">
+                  <template v-slot:activator="{ props }">
+                    <v-btn
+                      icon="mdi-dots-vertical"
+                      variant="text"
+                      size="small"
+                      v-bind="props"
+                      @click.stop
+                    ></v-btn>
+                  </template>
+                  <v-list density="compact">
+                    <v-list-item
+                      v-for="action in hostActions"
+                      :key="action.key"
+                      :value="action.key"
+                      @click="handleHostAction(action.key, host)"
+                    >
+                      <template v-slot:prepend>
+                        <v-icon :icon="action.icon" size="small"></v-icon>
+                      </template>
+                      <v-list-item-title>{{ action.label }}</v-list-item-title>
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
+              </v-card-title>
+
+              <v-card-text class="host-info">
+                <div class="info-item">
+                  <span class="label">类型：</span>
+                  <span class="value">{{ getConnectionTypeLabel(host.connectionType) }}</span>
+                </div>
+                <div class="info-item" v-if="host.config.host">
+                  <span class="label">地址：</span>
+                  <span class="value">{{ host.config.host }}</span>
+                </div>
+                <div class="info-item" v-if="host.config.port">
+                  <span class="label">端口：</span>
+                  <span class="value">{{ host.config.port }}</span>
+                </div>
+                
+                <!-- 添加连接后的系统信息 -->
+                <template v-if="host.status === 'connected' && host.info">
+                  <div class="info-item">
+                    <span class="label">版本：</span>
+                    <span class="value">{{ host.info.version }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">系统：</span>
+                    <span class="value">{{ host.info.os }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">内核：</span>
+                    <span class="value">{{ host.info.kernelVersion }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">CPU：</span>
+                    <span class="value">{{ host.info.cpus }} 核</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">内存：</span>
+                    <span class="value">{{ formatBytes(host.info.memory) }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">容器数：</span>
+                    <span class="value">{{ host.info.containers }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">镜像数：</span>
+                    <span class="value">{{ host.info.images }}</span>
+                  </div>
+                </template>
+              </v-card-text>
+            </v-card>
+          </v-col>
+
+          <!-- 添加主机卡片 -->
+          <v-col cols="12" sm="6" md="4" lg="3">
+            <v-card
+              class="add-host-card"
+              elevation="0"
+              @click="handleAddHost"
+              :ripple="true"
+            >
+              <v-icon size="x-large" color="primary">mdi-plus</v-icon>
+              <span class="text-primary">添加主机</span>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-container>
+    </template>
+
+    <!-- 添加主机对话框 -->
     <add-host-dialog
-      ref="addHostDialogRef"
-      :edit-host="editingHost"
-      @saved="handleHostSaved"
+      v-model="showAddHostDialog"
+      @close="showAddHostDialog = false"
+      @saved="handleHostAdded"
     />
+
+    <!-- 消息提示 -->
+    <v-snackbar
+      v-model="snackbar.show"
+      :color="snackbar.color"
+      :timeout="3000"
+      location="top"
+    >
+      {{ snackbar.text }}
+    </v-snackbar>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { More, Plus } from '@element-plus/icons-vue'
+import { ref, computed, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDockerStore } from '../../stores/dockerStore'
-import { formatBytes } from '../../utils/format'
 import AddHostDialog from './AddHostDialog.vue'
 import type { DockerHost } from '../../../types/docker'
-import { useRouter } from 'vue-router'
 
-const dockerStore = useDockerStore()
-const addHostDialogRef = ref()
-const editingHost = ref<DockerHost | null>(null)
 const router = useRouter()
+const dockerStore = useDockerStore()
+const showAddHostDialog = ref(false)
 
 const hosts = computed(() => dockerStore.hosts)
 const selectedHostId = computed(() => dockerStore.selectedHostId)
 
-const getStatusType = (status: string) => {
+const snackbar = reactive({
+  show: false,
+  text: '',
+  color: 'success'
+})
+
+const hostActions = [
+  {
+    key: 'connect',
+    label: '连接',
+    icon: 'mdi-lan-connect'
+  },
+  {
+    key: 'edit',
+    label: '编辑',
+    icon: 'mdi-pencil'
+  },
+  {
+    key: 'delete',
+    label: '删除',
+    icon: 'mdi-delete'
+  }
+]
+
+const showMessage = (text: string, color: 'success' | 'error' = 'success') => {
+  snackbar.text = text
+  snackbar.color = color
+  snackbar.show = true
+}
+
+const getStatusColor = (status: string) => {
   switch (status) {
     case 'connected':
       return 'success'
     case 'connecting':
       return 'warning'
     case 'disconnected':
-      return 'info'
-    case 'error':
-      return 'danger'
+      return 'error'
     default:
-      return 'info'
+      return 'grey'
   }
 }
 
@@ -159,14 +230,12 @@ const getStatusText = (status: string) => {
       return '连接中'
     case 'disconnected':
       return '未连接'
-    case 'error':
-      return '错误'
     default:
       return status
   }
 }
 
-const getConnectionType = (type: string) => {
+const getConnectionTypeLabel = (type: string) => {
   switch (type) {
     case 'local':
       return '本地'
@@ -179,226 +248,179 @@ const getConnectionType = (type: string) => {
   }
 }
 
-const handleCommand = async (command: string, host: DockerHost) => {
+const handleAddHost = () => {
+  showAddHostDialog.value = true
+}
+
+const handleHostAdded = () => {
+  showAddHostDialog.value = false
+  showMessage('添加主机成功')
+}
+
+const handleHostClick = async (host: DockerHost) => {
   try {
-    switch (command) {
-      case 'connect':
-        if (host.status === 'connected') {
-          await dockerStore.disconnectHost(host.id)
-        } else {
-          await dockerStore.connectHost(host.id)
-          router.push({ name: 'containers', params: { id: host.id } })
-        }
-        break
-        
-      case 'edit':
-        editingHost.value = host
-        addHostDialogRef.value?.open()
-        break
-        
-      case 'delete':
-        ElMessageBox.confirm(
-          '确定要删除这个主机吗？这将断开所有连接。',
-          '删除主机',
-          {
-            type: 'warning',
-          }
-        )
-          .then(async () => {
-            await dockerStore.removeHost(host.id)
-            ElMessage.success('主机已删除')
-          })
-          .catch(() => {})
-        break
-    }
+    await dockerStore.setSelectedHost(host.id)
+    router.push({ name: 'containers', params: { id: host.id } })
   } catch (error) {
-    ElMessage.error(`操作失败: ${(error as Error).message}`)
+    showMessage(`操作失败: ${(error as Error).message}`, 'error')
   }
 }
 
-const handleAddHost = () => {
-  editingHost.value = null
-  addHostDialogRef.value?.open()
+const handleHostAction = async (action: string, host: DockerHost) => {
+  try {
+    switch (action) {
+      case 'connect':
+        if (host.status === 'connected') {
+          await dockerStore.disconnectHost(host.id)
+          showMessage('已断开连接')
+        } else {
+          await dockerStore.connectHost(host.id)
+          showMessage('连接成功')
+          router.push({ name: 'containers', params: { id: host.id } })
+        }
+        break
+      case 'edit':
+        // TODO: 实现编辑功能
+        break
+      case 'delete':
+        await dockerStore.removeHost(host.id)
+        showMessage('删除成功')
+        break
+    }
+  } catch (error) {
+    showMessage(`操作失败: ${(error as Error).message}`, 'error')
+  }
 }
 
-const handleHostSaved = () => {
-  editingHost.value = null
+const getImageUrl = (name: string) => {
+  return new URL(`../../assets/${name}`, import.meta.url).href
 }
 
-const handleHostClick = (host: DockerHost) => {
-  if (host.status === 'connected') {
-    router.push({ name: 'containers', params: { id: host.id } })
+const formatBytes = (bytes: number) => {
+  if (bytes < 1024) {
+    return bytes + ' B'
+  } else if (bytes < 1024 * 1024) {
+    return (bytes / 1024).toFixed(2) + ' KB'
+  } else if (bytes < 1024 * 1024 * 1024) {
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
   } else {
-    handleCommand('connect', host)
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
   }
 }
 </script>
 
-<style lang="scss">
-@use '../../styles/theme.scss' as *;
-
+<style scoped lang="scss">
 .host-list {
   height: 100%;
-  padding: var(--spacing-lg);
-  background-color: var(--background-default);
+  padding: 20px;
+  background-color: rgb(var(--v-theme-background));
   overflow-y: auto;
   box-sizing: border-box;
 }
 
-/* 欢迎界面样式 */
 .welcome-container {
-  height: 100%;
-  @include flex-center;
-  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-dark) 100%);
-  
-  .welcome-content {
-    text-align: center;
-    padding: var(--spacing-xl);
-    background: var(--background-paper);
-    border-radius: 16px;
-    box-shadow: var(--card-shadow);
-    max-width: 480px;
-    width: 100%;
-    
-    .welcome-logo {
-      width: 120px;
-      height: 120px;
-      margin-bottom: var(--spacing-lg);
-    }
-    
-    .welcome-title {
-      @include gradient-text;
-      font-size: 3rem;
-      font-weight: 700;
-      margin-bottom: var(--spacing-xs);
-    }
-    
-    .welcome-subtitle {
-      color: var(--text-secondary);
-      font-size: 1.2rem;
-      margin-bottom: var(--spacing-xl);
-    }
-    
-    .welcome-actions {
-      .action-button {
-        background: var(--primary-main);
-        border: none;
-        padding: 12px 36px;
-        font-size: 1.1rem;
-        border-radius: 8px;
-        
-        &:hover {
-          background: var(--primary-light);
-        }
-        
-        .button-icon {
-          margin-right: var(--spacing-xs);
-        }
-      }
-    }
-  }
+  position: fixed;
+  top: 40px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgb(var(--v-theme-primary)) 0%, rgb(var(--v-theme-secondary)) 100%);
 }
 
-/* 主机列表样式 */
-.el-row {
-  margin-bottom: var(--spacing-lg);
+.welcome-content {
+  text-align: center;
+  padding: 48px;
+  background: rgb(var(--v-theme-surface));
+  border-radius: 16px;
+  max-width: 480px;
+  width: 100%;
+  
+  .welcome-logo {
+    border-radius: 16px;
+  }
+  
+  .welcome-title {
+    margin-top: 24px;
+  }
+  
+  .welcome-subtitle {
+    margin-top: 8px;
+    color: rgba(var(--v-theme-on-surface), 0.7);
+  }
+  
+  .welcome-actions {
+    margin-top: 32px;
+  }
 }
 
 .host-card {
-  @include card-hover;
-  border: none;
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: var(--spacing-lg);
+  transition: all 0.3s ease;
   
-  .el-card__header {
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--background-paper);
-    border-bottom: 1px solid var(--border-color);
+  &:hover {
+    transform: translateY(-4px);
   }
   
+  &.active {
+    border: 2px solid rgb(var(--v-theme-primary));
+  }
+
   .card-header {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: 8px;
     
     .host-name {
       flex: 1;
-      margin: 0;
-      color: var(--text-primary);
-      font-size: 1.1rem;
       font-weight: 600;
     }
-    
-    .status-tag {
-      border-radius: 4px;
-      padding: 4px 8px;
-    }
   }
-  
+
   .host-info {
-    padding: var(--spacing-md) var(--spacing-lg);
-    
     .info-item {
       display: flex;
-      margin-bottom: var(--spacing-xs);
+      margin-bottom: 4px;
       
       .label {
-        color: var(--text-hint);
         width: 70px;
+        opacity: 0.7;
       }
       
       .value {
-        color: var(--text-primary);
         flex: 1;
       }
     }
   }
-  
-  &.active {
-    border: 2px solid var(--primary-main);
-  }
 }
 
 .add-host-card {
-  @include card-hover;
-  @include flex-center;
+  height: 100%;
+  min-height: 200px;
+  display: flex;
   flex-direction: column;
-  height: 200px;
-  background: var(--background-paper);
-  border: 2px dashed var(--border-color);
-  border-radius: 12px;
-  cursor: pointer;
-  gap: var(--spacing-sm);
-  color: var(--text-hint);
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(var(--v-theme-primary), 0.3);
+  gap: 8px;
+  transition: all 0.3s ease;
   
   &:hover {
-    border-color: var(--primary-main);
-    color: var(--primary-main);
-  }
-  
-  .el-icon {
-    font-size: 2rem;
-  }
-  
-  span {
-    font-size: 1.1rem;
+    border-color: rgb(var(--v-theme-primary));
+    background: rgba(var(--v-theme-primary), 0.05);
   }
 }
 
-// 下拉菜单样式
-.el-dropdown-menu {
-  border: none;
-  box-shadow: var(--card-shadow);
-  border-radius: 8px;
-  
-  .el-dropdown-menu__item {
-    padding: var(--spacing-sm) var(--spacing-lg);
-    
-    &:hover {
-      background-color: var(--secondary-light);
-      color: var(--primary-main);
-    }
-  }
+.gradient-text {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--v-theme-primary)) 0%,
+    rgb(var(--v-theme-secondary)) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
 }
 </style> 

@@ -1,9 +1,9 @@
 <template>
   <v-dialog
-    v-model="dialogVisible"
+    :model-value="modelValue"
     width="680"
     persistent
-    @update:model-value="handleClose"
+    @update:model-value="$emit('update:modelValue', $event)"
   >
     <v-card class="host-dialog" elevation="0">
       <v-card-title class="px-4 py-3 bg-primary d-flex align-center">
@@ -14,7 +14,7 @@
           variant="text"
           size="small"
           color="white"
-          @click="dialogVisible = false"
+          @click="$emit('update:modelValue', false)"
         ></v-btn>
       </v-card-title>
 
@@ -69,7 +69,17 @@ import SSHConfigForm from './SSHConfigForm.vue'
 import TCPConfigForm from './TCPConfigForm.vue'
 import LocalConfigForm from './LocalConfigForm.vue'
 
-const dialogVisible = ref(false)
+// 定义 props
+const props = defineProps<{
+  modelValue: boolean
+}>()
+
+// 定义 emits
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'saved'): void
+}>()
+
 const activeTab = ref('ssh')
 
 const handleClose = (val: boolean) => {
@@ -79,18 +89,9 @@ const handleClose = (val: boolean) => {
 }
 
 const handleSaved = () => {
-  dialogVisible.value = false
+  emit('saved')
+  emit('update:modelValue', false)
 }
-
-// 暴露方法给父组件
-defineExpose({
-  open: () => {
-    dialogVisible.value = true
-  },
-  close: () => {
-    dialogVisible.value = false
-  }
-})
 </script>
 
 <style scoped>
