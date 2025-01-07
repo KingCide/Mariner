@@ -2,7 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
 import Welcome from '../views/Welcome.vue'
 import HostList from '../components/docker/HostList.vue'
-import HostManagement from '../views/host/HostManagement.vue'
+import HostManagement from '../components/host/HostManagement.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -24,22 +24,22 @@ const router = createRouter({
             {
               path: 'containers',
               name: 'containers',
-              component: () => import("@/views/host/Containers.vue")
+              component: () => import("@/components/host/Containers.vue")
             },
             {
               path: 'images',
               name: 'images',
-              component: () => import("@/views/host/Images.vue")
+              component: () => import("@/components/host/Images.vue")
             },
             {
               path: 'volumes',
               name: 'volumes',
-              component: () => import("@/views/host/Volumes.vue")
+              component: () => import("@/components/host/Volumes.vue")
             },
             {
               path: 'networks',
               name: 'networks',
-              component: () => import("@/views/host/Networks.vue")
+              component: () => import("@/components/host/Networks.vue")
             }
           ]
         }
