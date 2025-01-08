@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app class="app-root">
     <!-- 标题栏 -->
     <v-app-bar class="title-bar" height="40" flat>
       <div class="title-left">
@@ -48,7 +48,7 @@
     </v-app-bar>
 
     <!-- 主内容区 -->
-    <v-main>
+    <v-main class="main-content">
       <router-view />
     </v-main>
 
@@ -100,12 +100,50 @@ onUnmounted(() => {
 })
 </script>
 
+<style>
+/* 全局滚动条样式 */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+::-webkit-scrollbar-track {
+  display: none;
+}
+
+::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+/* 移除悬停样式，因为已经隐藏了滚动条 */
+::-webkit-scrollbar-thumb:hover {
+  background-color: transparent;
+}
+</style>
+
 <style scoped>
+.app-root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+}
+
 .title-bar {
   -webkit-app-region: drag;
   background-color: rgb(var(--v-theme-surface)) !important;
   border-bottom: 1px solid rgba(var(--v-border-color), 0.12);
   width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
 }
 
 .title-left {
@@ -148,9 +186,5 @@ onUnmounted(() => {
 .control-button.close:hover {
   background-color: rgb(232, 17, 35) !important;
   color: white !important;
-}
-
-.v-main {
-  padding-top: 40px !important;
 }
 </style> 

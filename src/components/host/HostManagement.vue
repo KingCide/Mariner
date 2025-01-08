@@ -1,104 +1,120 @@
 <template>
-  <el-container class="host-management">
-    <el-aside :width="isCollapse ? '64px' : '200px'" class="sidebar">
-      <div class="sidebar-header">
-        <el-button
-          class="collapse-button"
-          :icon="isCollapse ? 'Expand' : 'Fold'"
-          @click="toggleCollapse"
+  <v-layout class="host-management">
+    <!-- 左侧导航栏 -->
+    <v-navigation-drawer
+      v-model="drawer"
+      :rail="isCollapse"
+      permanent
+      class="sidebar"
+    >
+      <v-list>
+        <v-list-item
+          v-for="item in menuItems"
+          :key="item.name"
+          :to="{ name: item.name, params: { id: hostId } }"
+          :prepend-icon="item.icon"
+          :title="item.title"
+          :value="item.name"
         />
-      </div>
-      <el-menu
-        :router="true"
-        :default-active="activeMenu"
-        class="host-menu"
-        :collapse="isCollapse"
-      >
-        <el-menu-item index="containers" :route="{ name: 'containers', params: { id: hostId } }">
-          <el-icon><Monitor /></el-icon>
-          <template #title>容器管理</template>
-        </el-menu-item>
-        <el-menu-item index="images" :route="{ name: 'images', params: { id: hostId } }">
-          <el-icon><Picture /></el-icon>
-          <template #title>镜像管理</template>
-        </el-menu-item>
-        <el-menu-item index="volumes" :route="{ name: 'volumes', params: { id: hostId } }">
-          <el-icon><Files /></el-icon>
-          <template #title>数据卷</template>
-        </el-menu-item>
-        <el-menu-item index="networks" :route="{ name: 'networks', params: { id: hostId } }">
-          <el-icon><Connection /></el-icon>
-          <template #title>网络管理</template>
-        </el-menu-item>
-      </el-menu>
-    </el-aside>
+      </v-list>
+    </v-navigation-drawer>
 
-    <el-container>
-      <el-header height="60px" class="header">
-        <div class="breadcrumb">
-          <el-breadcrumb>
-            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item>{{ hostName }}</el-breadcrumb-item>
-            <el-breadcrumb-item>{{ getMenuTitle(activeMenu) }}</el-breadcrumb-item>
-          </el-breadcrumb>
-        </div>
-
-        <div class="header-actions">
-          <el-tag
-            :type="hostStatus === 'connected' ? 'success' : 'danger'"
-            class="status-tag"
-          >
-            {{ hostStatus === 'connected' ? '已连接' : '未连接' }}
-          </el-tag>
-          <el-button
-            type="primary"
-            :icon="Refresh"
-            circle
-            @click="handleRefresh"
-          />
-          <el-button
-            :type="hostStatus === 'connected' ? 'danger' : 'success'"
-            :icon="hostStatus === 'connected' ? 'Disconnect' : 'Connection'"
-            circle
-            @click="handleToggleConnection"
-          />
-        </div>
-      </el-header>
-
-      <el-main>
-        <router-view v-if="hostStatus === 'connected'" />
-        <el-empty
-          v-else
-          description="主机未连接"
+    <!-- 主内容区域 -->
+    <v-main class="main-content">
+      <!-- 顶部工具栏 -->
+      <v-app-bar flat class="app-bar">
+        <v-btn
+          icon
+          @click="toggleDrawer"
         >
-          <el-button type="primary" @click="handleConnect">连接主机</el-button>
-        </el-empty>
-      </el-main>
-    </el-container>
-  </el-container>
+          <v-icon>{{ isCollapse ? 'mdi-menu-open' : 'mdi-menu' }}</v-icon>
+        </v-btn>
+
+        <v-breadcrumbs :items="breadcrumbs" />
+
+        <v-spacer />
+
+        <v-chip
+          :color="hostStatus === 'connected' ? 'success' : 'error'"
+          class="status-tag"
+        >
+          {{ hostStatus === 'connected' ? '已连接' : '未连接' }}
+        </v-chip>
+
+        <v-btn
+          icon
+          color="primary"
+          class="ml-2"
+          @click="handleRefresh"
+        >
+          <v-icon>mdi-refresh</v-icon>
+        </v-btn>
+
+        <v-btn
+          icon
+          :color="hostStatus === 'connected' ? 'error' : 'success'"
+          class="ml-2"
+          @click="handleToggleConnection"
+        >
+          <v-icon>{{ hostStatus === 'connected' ? 'mdi-lan-disconnect' : 'mdi-lan-connect' }}</v-icon>
+        </v-btn>
+      </v-app-bar>
+
+      <!-- 主要内容区域 -->
+      <div class="content-wrapper">
+        <template v-if="hostStatus === 'connected'">
+          <router-view />
+        </template>
+        <template v-else>
+          <v-row justify="center" align="center" style="height: 100%">
+            <v-col cols="12" sm="8" md="6" lg="4" class="text-center">
+              <v-card flat class="pa-8">
+                <v-icon size="64" color="error" class="mb-4">mdi-lan-disconnect</v-icon>
+                <div class="text-h5 mb-4">主机未连接</div>
+                <v-btn
+                  color="primary"
+                  prepend-icon="mdi-lan-connect"
+                  @click="handleConnect"
+                >
+                  连接主机
+                </v-btn>
+              </v-card>
+            </v-col>
+          </v-row>
+        </template>
+      </div>
+    </v-main>
+  </v-layout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import {
-  Monitor,
-  Picture,
-  Files,
-  Connection,
-  Refresh,
-  Expand,
-  Fold
-} from '@element-plus/icons-vue'
 import { useDockerStore } from '../../stores/dockerStore'
 
 const route = useRoute()
 const dockerStore = useDockerStore()
+const drawer = ref(true)
+const isCollapse = ref(false)
+
 const hostId = computed(() => route.params.id as string)
 const hostName = computed(() => dockerStore.selectedHost?.name || '')
 const hostStatus = computed(() => dockerStore.selectedHost?.status || 'disconnected')
-const activeMenu = computed(() => route.name as string)
-const isCollapse = ref(false)
+
+// 菜单项配置
+const menuItems = [
+  { name: 'containers', title: '容器管理', icon: 'mdi-view-dashboard' },
+  { name: 'images', title: '镜像管理', icon: 'mdi-image-multiple' },
+  { name: 'volumes', title: '数据卷', icon: 'mdi-database' },
+  { name: 'networks', title: '网络管理', icon: 'mdi-lan' }
+]
+
+// 面包屑导航
+const breadcrumbs = computed(() => [
+  { title: '首页', disabled: false,  to: { name: 'home' } },
+  { title: hostName.value, disabled: true },
+  { title: getMenuTitle(route.name as string), disabled: true }
+])
 
 // 获取菜单标题
 const getMenuTitle = (menu: string) => {
@@ -112,7 +128,7 @@ const getMenuTitle = (menu: string) => {
 }
 
 // 切换侧边栏
-const toggleCollapse = () => {
+const toggleDrawer = () => {
   isCollapse.value = !isCollapse.value
 }
 
@@ -142,61 +158,41 @@ const handleConnect = () => {
 
 <style scoped>
 .host-management {
+  display: flex;
   height: 100%;
-}
-
-.sidebar {
-  background-color: var(--el-bg-color);
-  border-right: 1px solid var(--el-border-color-light);
-  transition: width 0.3s;
-}
-
-.sidebar-header {
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--el-border-color-light);
-}
-
-.collapse-button {
-  padding: 8px;
-}
-
-.host-menu {
-  border-right: none;
-}
-
-.header {
-  background-color: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color-light);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-}
-
-.breadcrumb {
-  display: flex;
-  align-items: center;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  
+  .sidebar {
+    flex: 0 0 auto;
+    border-right: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
+  }
+  
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    
+    .app-bar {
+      flex: 0 0 auto;
+    }
+    
+    .content-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      
+      /* 为内容底部添加额外空间 */
+      & > * {
+        margin-bottom: 16px;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
 }
 
 .status-tag {
-  margin-right: 8px;
-}
-
-:deep(.el-menu) {
-  --el-menu-hover-bg-color: var(--el-color-primary-light-9);
-}
-
-:deep(.el-menu-item.is-active) {
-  background-color: var(--el-color-primary-light-9);
+  margin-left: 12px;
 }
 </style> 
