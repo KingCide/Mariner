@@ -1,33 +1,32 @@
 <template>
   <div class="containers">
     <!-- 工具栏 -->
-    <v-row class="mb-4">
-      <v-col cols="12" sm="auto">
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-plus"
-          @click="handleCreate"
-        >
-          创建容器
-        </v-btn>
-      </v-col>
-      <v-col cols="12" sm="4">
-        <v-text-field
-          v-model="searchText"
-          prepend-inner-icon="mdi-magnify"
-          label="搜索容器"
-          hide-details
-          density="comfortable"
-          variant="outlined"
-        />
-      </v-col>
-    </v-row>
+    <div class="toolbar d-flex align-center justify-space-between">
+      <v-btn
+        color="primary"
+        prepend-icon="mdi-plus"
+        @click="handleCreate"
+        rounded="lg"
+      >
+        创建容器
+      </v-btn>
+      <v-text-field
+        v-model="searchText"
+        prepend-inner-icon="mdi-magnify"
+        label="搜索容器"
+        hide-details
+        density="comfortable"
+        variant="outlined"
+        style="max-width: 300px"
+        rounded="lg"
+      />
+    </div>
 
-    <!-- 容器统计信息 -->
-    <v-row class="mb-4">
+    <!-- 统计信息卡片 -->
+    <v-row class="stats-row">
       <v-col cols="12" sm="6" md="3">
-        <v-card>
-          <v-card-text class="d-flex align-center">
+        <v-card elevation="2" hover class="stat-card">
+          <v-card-text class="d-flex align-center pa-4">
             <div>
               <div class="text-subtitle-2 text-medium-emphasis">总容器数</div>
               <div class="text-h4">{{ hostStats?.containers || 0 }}</div>
@@ -38,8 +37,8 @@
         </v-card>
       </v-col>
       <v-col cols="12" sm="6" md="3">
-        <v-card>
-          <v-card-text class="d-flex align-center">
+        <v-card elevation="2" hover class="stat-card">
+          <v-card-text class="d-flex align-center pa-4">
             <div>
               <div class="text-subtitle-2 text-medium-emphasis">运行中</div>
               <div class="text-h4">{{ runningContainers.length }}</div>
@@ -50,8 +49,8 @@
         </v-card>
       </v-col>
       <v-col cols="12" sm="6" md="3">
-        <v-card>
-          <v-card-text class="d-flex align-center">
+        <v-card elevation="2" hover class="stat-card">
+          <v-card-text class="d-flex align-center pa-4">
             <div>
               <div class="text-subtitle-2 text-medium-emphasis">CPU 使用率</div>
               <div class="text-h4">{{ hostStats?.cpu || 0 }}%</div>
@@ -62,8 +61,8 @@
         </v-card>
       </v-col>
       <v-col cols="12" sm="6" md="3">
-        <v-card>
-          <v-card-text class="d-flex align-center">
+        <v-card elevation="2" hover class="stat-card">
+          <v-card-text class="d-flex align-center pa-4">
             <div>
               <div class="text-subtitle-2 text-medium-emphasis">内存使用率</div>
               <div class="text-h4">{{ hostStats?.memory || 0 }}%</div>
@@ -75,14 +74,16 @@
       </v-col>
     </v-row>
 
-    <!-- 容器列表 -->
-    <v-card class="mb-4">
+    <!-- 容器列表卡片 -->
+    <v-card elevation="2" hover class="container-list-card flex-grow-1">
       <v-data-table
         :loading="loading"
         :headers="headers"
         :items="filteredContainers"
         :search="searchText"
         hover
+        fixed-header
+        height="100%"
       >
         <template v-slot:item.id="{ item }">
           <span class="text-caption text-medium-emphasis">{{ item.id.substring(0, 12) }}</span>
@@ -450,30 +451,98 @@ const handleTerminal = (item: any) => {
 <style scoped>
 .containers {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.toolbar {
+  padding: 8px;
+  background-color: rgb(var(--v-theme-surface));
+  border-radius: 12px;
+}
+
+.stat-card,
+.container-list-card {
+  border-radius: 12px !important;
+  background-color: rgb(var(--v-theme-surface)) !important;
+  transition: transform 0.2s ease-in-out;
+}
+
+.stats-row {
+  margin: 0;
+}
+
+.stat-card {
+  height: 100%;
+}
+
+.container-list-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:deep(.v-card--hover) {
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+:deep(.v-data-table) {
+  background: transparent;
+  height: 100%;
   
-  /* 移除固定的底部内边距，改用 margin */
-  & > *:not(:last-child) {
-    margin-bottom: 16px;
+  .v-table__wrapper {
+    border-radius: 12px;
+    height: 100%;
+    overflow: auto;
+  } 
+
+  .v-table {
+    height: 100%;
+  }
+}
+
+:deep(.v-data-table-header) {
+  background-color: rgb(var(--v-theme-surface));
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+:deep(.v-btn) {
+  text-transform: none;
+}
+
+:deep(.v-field) {
+  border-radius: 12px !important;
+  
+  .v-field__outline__start {
+    border-radius: 12px 0 0 12px !important;
   }
   
-  /* 表格样式优化 */
-  :deep(.v-data-table) {
-    background: transparent;
-    
-    /* 隐藏表格的滚动条 */
-    .v-table__wrapper::-webkit-scrollbar {
-      width: 0;
-      height: 0;
-      background: transparent;
-    }
+  .v-field__outline__end {
+    border-radius: 0 12px 12px 0 !important;
   }
+}
+/* 自定义滚动条样式 */
+:deep(.v-table__wrapper)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:deep(.v-table__wrapper)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:deep(.v-table__wrapper)::-webkit-scrollbar-thumb {
+  background: rgba(var(--v-theme-on-surface), 0.2);
+  border-radius: 4px;
   
-  :deep(.v-data-table-header) {
-    background-color: rgb(var(--v-theme-surface));
-  }
-  
-  :deep(.v-data-table__wrapper) {
-    border-radius: 8px;
+  &:hover {
+    background: rgba(var(--v-theme-on-surface), 0.3);
   }
 }
 </style> 
