@@ -2,14 +2,25 @@
   <div class="containers">
     <!-- 工具栏 -->
     <div class="toolbar d-flex align-center justify-space-between">
-      <v-btn
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="handleCreate"
-        rounded="lg"
-      >
-        创建容器
-      </v-btn>
+      <div class="d-flex align-center gap-2">
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="handleCreate"
+          rounded="lg"
+        >
+          创建容器
+        </v-btn>
+        <v-btn
+          :color="showStats ? 'primary' : 'default'"
+          :variant="showStats ? 'tonal' : 'outlined'"
+          prepend-icon="mdi-chart-box"
+          @click="showStats = !showStats"
+          rounded="lg"
+        >
+          统计信息
+        </v-btn>
+      </div>
       <v-text-field
         v-model="searchText"
         prepend-inner-icon="mdi-magnify"
@@ -23,56 +34,58 @@
     </div>
 
     <!-- 统计信息卡片 -->
-    <v-row class="stats-row">
-      <v-col cols="12" sm="6" md="3">
-        <v-card elevation="2" hover class="stat-card">
-          <v-card-text class="d-flex align-center pa-4">
-            <div>
-              <div class="text-subtitle-2 text-medium-emphasis">总容器数</div>
-              <div class="text-h4">{{ hostStats?.containers || 0 }}</div>
-            </div>
-            <v-spacer />
-            <v-icon size="48" color="primary" class="opacity-50">mdi-docker</v-icon>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <v-card elevation="2" hover class="stat-card">
-          <v-card-text class="d-flex align-center pa-4">
-            <div>
-              <div class="text-subtitle-2 text-medium-emphasis">运行中</div>
-              <div class="text-h4">{{ runningContainers.length }}</div>
-            </div>
-            <v-spacer />
-            <v-icon size="48" color="success" class="opacity-50">mdi-play-circle</v-icon>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <v-card elevation="2" hover class="stat-card">
-          <v-card-text class="d-flex align-center pa-4">
-            <div>
-              <div class="text-subtitle-2 text-medium-emphasis">CPU 使用率</div>
-              <div class="text-h4">{{ hostStats?.cpu || 0 }}%</div>
-            </div>
-            <v-spacer />
-            <v-icon size="48" color="info" class="opacity-50">mdi-cpu-64-bit</v-icon>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <v-card elevation="2" hover class="stat-card">
-          <v-card-text class="d-flex align-center pa-4">
-            <div>
-              <div class="text-subtitle-2 text-medium-emphasis">内存使用率</div>
-              <div class="text-h4">{{ hostStats?.memory || 0 }}%</div>
-            </div>
-            <v-spacer />
-            <v-icon size="48" color="warning" class="opacity-50">mdi-memory</v-icon>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+    <transition name="fade">
+      <v-row v-show="showStats" class="stats-row">
+        <v-col cols="12" sm="6" md="3">
+          <v-card elevation="2" hover class="stat-card">
+            <v-card-text class="d-flex align-center">
+              <div>
+                <div class="text-subtitle-2 text-medium-emphasis">总容器数</div>
+                <div class="text-h4">{{ hostStats?.containers || 0 }}</div>
+              </div>
+              <v-spacer />
+              <v-icon size="48" color="primary" class="opacity-50">mdi-docker</v-icon>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="3">
+          <v-card elevation="2" hover class="stat-card">
+            <v-card-text class="d-flex align-center pa-4">
+              <div>
+                <div class="text-subtitle-2 text-medium-emphasis">运行中</div>
+                <div class="text-h4">{{ runningContainers.length }}</div>
+              </div>
+              <v-spacer />
+              <v-icon size="48" color="success" class="opacity-50">mdi-play-circle</v-icon>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="3">
+          <v-card elevation="2" hover class="stat-card">
+            <v-card-text class="d-flex align-center pa-4">
+              <div>
+                <div class="text-subtitle-2 text-medium-emphasis">CPU 使用率</div>
+                <div class="text-h4">{{ hostStats?.cpu || 0 }}%</div>
+              </div>
+              <v-spacer />
+              <v-icon size="48" color="info" class="opacity-50">mdi-cpu-64-bit</v-icon>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="3">
+          <v-card elevation="2" hover class="stat-card">
+            <v-card-text class="d-flex align-center pa-4">
+              <div>
+                <div class="text-subtitle-2 text-medium-emphasis">内存使用率</div>
+                <div class="text-h4">{{ hostStats?.memory || 0 }}%</div>
+              </div>
+              <v-spacer />
+              <v-icon size="48" color="warning" class="opacity-50">mdi-memory</v-icon>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </transition>
 
     <!-- 容器列表卡片 -->
     <v-card elevation="2" hover class="container-list-card flex-grow-1">
@@ -446,6 +459,14 @@ const handleTerminal = (item: any) => {
   selectedContainerId.value = item.id
   terminalDialogRef.value?.show()
 }
+
+// 添加显示控制变量
+const showStats = ref(localStorage.getItem('showStats') !== 'false')
+
+// 监听状态变化并保存到本地存储
+watch(showStats, (value) => {
+  localStorage.setItem('showStats', value.toString())
+})
 </script>
 
 <style scoped>
@@ -472,16 +493,21 @@ const handleTerminal = (item: any) => {
 
 .stats-row {
   margin: 0;
+  flex: 0 0 auto; /* 不参与flex伸缩 */
 }
 
 .stat-card {
   height: 100%;
+  max-height: 100px;
+  min-height: 100px;
 }
 
 .container-list-card {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex: 1;  /* 占用所有剩余空间 */
+  min-height: 0; /* 允许内容溢出时滚动 */
 }
 
 :deep(.v-card--hover) {
@@ -544,5 +570,22 @@ const handleTerminal = (item: any) => {
   &:hover {
     background: rgba(var(--v-theme-on-surface), 0.3);
   }
+}
+
+/* 添加过渡动画样式 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* 添加按钮间距样式 */
+.gap-2 {
+  gap: 8px;
 }
 </style> 
