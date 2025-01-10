@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
-import { DockerService } from './services/docker'
+import { DockerService } from './services/dockerServer'
 import { IpcService } from './services/ipc'
 import { SettingsService } from './services/settings'
 

@@ -1,6 +1,6 @@
 import { ipcMain, dialog, IpcMainInvokeEvent, OpenDialogOptions } from 'electron'
 import { readFile } from 'fs/promises'
-import { DockerService } from './docker'
+import { DockerService } from './dockerServer'
 
 export class IpcService {
   constructor(
@@ -55,6 +55,19 @@ export class IpcService {
     ipcMain.handle('docker:startContainer', async (_: IpcMainInvokeEvent, { hostId, containerId }: { hostId: string; containerId: string }) => {
       const container = await this.dockerService.getContainer(hostId, containerId)
       return container.start()
+    })
+
+    // 批量操作容器
+    ipcMain.handle('docker:batchOperation', async (_: IpcMainInvokeEvent, { 
+      hostId, 
+      containerIds, 
+      operation 
+    }: { 
+      hostId: string; 
+      containerIds: string[]; 
+      operation: 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause' | 'remove' 
+    }) => {
+      return this.dockerService.batchOperation(hostId, containerIds, operation)
     })
 
     ipcMain.handle('docker:stopContainer', async (_: IpcMainInvokeEvent, { hostId, containerId }: { hostId: string; containerId: string }) => {
