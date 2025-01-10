@@ -122,6 +122,10 @@
           {{ formatDate(item.created) }}
         </template>
 
+        <template v-slot:item.image="{ item }">
+          <div class="image-name">{{ item.image }}</div>
+        </template>
+
         <template v-slot:item.actions="{ item }">
           <v-btn-group density="comfortable">
             <v-btn
@@ -263,12 +267,12 @@ const searchText = ref('')
 // 表格配置
 const headers = [
   { title: '容器ID', key: 'id', width: 120, align: 'start' },
-  { title: '名称', key: 'name', align: 'start', sortable: true },
-  { title: '镜像', key: 'image', align: 'start', sortable: true },
+  { title: '名称', key: 'name', align: 'start', sortable: true, width: 200 },
+  { title: '镜像', key: 'image', align: 'start', sortable: true, width: 250 },
   { title: '状态', key: 'status', width: 100, align: 'start' },
-  { title: '端口', key: 'ports', align: 'start' },
-  { title: '创建时间', key: 'created', align: 'start', sortable: true },
-  { title: '操作', key: 'actions', align: 'end', sortable: false }
+  { title: '端口', key: 'ports', align: 'start', width: 150 },
+  { title: '创建时间', key: 'created', align: 'start', sortable: true, width: 180 },
+  { title: '操作', key: 'actions', align: 'end', sortable: false, width: 150 }
 ] as const
 
 // 过滤后的容器列表
@@ -587,5 +591,12 @@ watch(showStats, (value) => {
 /* 添加按钮间距样式 */
 .gap-2 {
   gap: 8px;
+}
+
+.image-name {
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.2;
+  max-width: 400px;
 }
 </style> 

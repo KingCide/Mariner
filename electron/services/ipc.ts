@@ -1,12 +1,10 @@
 import { ipcMain, dialog, IpcMainInvokeEvent, OpenDialogOptions } from 'electron'
 import { readFile } from 'fs/promises'
 import { DockerService } from './docker'
-import { SSHService } from './ssh'
 
 export class IpcService {
   constructor(
     private dockerService: DockerService,
-    private sshService: SSHService
   ) {}
 
   public registerHandlers(ipcMain: Electron.IpcMain): void {

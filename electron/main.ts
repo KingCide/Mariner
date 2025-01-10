@@ -2,22 +2,19 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { DockerService } from './services/docker'
 import { IpcService } from './services/ipc'
-import { SSHService } from './services/ssh'
 import { SettingsService } from './services/settings'
 
 class Application {
   private mainWindow: BrowserWindow | null = null
   private dockerService: DockerService
   private ipcService: IpcService
-  private sshService: SSHService
   private settingsService: SettingsService
 
   constructor() {
     // 初始化服务
     this.dockerService = new DockerService()
-    this.sshService = new SSHService()
     this.settingsService = new SettingsService()
-    this.ipcService = new IpcService(this.dockerService, this.sshService)
+    this.ipcService = new IpcService(this.dockerService)
 
     // 注册错误处理
     this.handleErrors()
@@ -179,7 +176,6 @@ class Application {
   // 清理资源
   private cleanup(): void {
     this.dockerService.cleanup()
-    this.sshService.cleanup()
   }
 }
 
