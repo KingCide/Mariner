@@ -1,3 +1,5 @@
+// 后端服务层，包含实际的 Docker 操作逻辑。
+// 直接与 Docker daemon 的 API 进行交互。
 import Docker from 'dockerode'
 import { Client } from 'ssh2'
 import { Server, createServer } from 'net'
@@ -668,6 +670,344 @@ export class DockerService {
       return await image.remove()
     } catch (error) {
       this.log(LogLevel.ERROR, 'Failed to delete image', error)
+      throw error
+    }
+  }
+
+  // 基础容器操作接口
+  async startContainer(hostId: string, containerId: string): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Starting container', { hostId, containerId })
+      const container = docker.getContainer(containerId)
+      await container.start()
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to start container', error)
+      throw error
+    }
+  }
+
+  async stopContainer(hostId: string, containerId: string): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Stopping container', { hostId, containerId })
+      const container = docker.getContainer(containerId)
+      await container.stop()
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to stop container', error)
+      throw error
+    }
+  }
+
+  async killContainer(hostId: string, containerId: string): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Killing container', { hostId, containerId })
+      const container = docker.getContainer(containerId)
+      await container.kill()
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to kill container', error)
+      throw error
+    }
+  }
+
+  async pauseContainer(hostId: string, containerId: string): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Pausing container', { hostId, containerId })
+      const container = docker.getContainer(containerId)
+      await container.pause()
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to pause container', error)
+      throw error
+    }
+  }
+
+  async unpauseContainer(hostId: string, containerId: string): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Unpausing container', { hostId, containerId })
+      const container = docker.getContainer(containerId)
+      await container.unpause()
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to unpause container', error)
+      throw error
+    }
+  }
+
+  // 批量操作接口
+  async batchOperation(
+    hostId: string,
+    containerIds: string[],
+    operation: 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause' | 'remove'
+  ): Promise<{
+    success: string[],
+    failed: Array<{
+      id: string,
+      error: string
+    }>
+  }> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    this.log(LogLevel.INFO, 'Performing batch operation', { 
+      hostId, 
+      operation, 
+      containerCount: containerIds.length 
+    })
+
+    const results = {
+      success: [] as string[],
+      failed: [] as Array<{ id: string; error: string }>
+    }
+
+    await Promise.all(
+      containerIds.map(async (containerId) => {
+        try {
+          const container = docker.getContainer(containerId)
+          switch (operation) {
+            case 'start':
+              await container.start()
+              break
+            case 'stop':
+              await container.stop()
+              break
+            case 'restart':
+              await container.restart()
+              break
+            case 'kill':
+              await container.kill()
+              break
+            case 'pause':
+              await container.pause()
+              break
+            case 'unpause':
+              await container.unpause()
+              break
+            case 'remove':
+              await container.remove({ force: true })
+              break
+          }
+          results.success.push(containerId)
+        } catch (error) {
+          this.log(LogLevel.ERROR, `Failed to ${operation} container`, {
+            containerId,
+            error
+          })
+          results.failed.push({
+            id: containerId,
+            error: (error as Error).message
+          })
+        }
+      })
+    )
+
+    this.log(LogLevel.INFO, 'Batch operation completed', {
+      operation,
+      successCount: results.success.length,
+      failedCount: results.failed.length
+    })
+
+    return results
+  }
+
+  // 高级操作接口
+  async exportContainer(hostId: string, containerId: string, savePath: string): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Exporting container', { hostId, containerId, savePath })
+      const container = docker.getContainer(containerId)
+      const stream = await container.export()
+      await new Promise((resolve, reject) => {
+        const writeStream = require('fs').createWriteStream(savePath)
+        stream.pipe(writeStream)
+        writeStream.on('finish', resolve)
+        writeStream.on('error', reject)
+      })
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to export container', error)
+      throw error
+    }
+  }
+
+  async commitContainer(
+    hostId: string,
+    containerId: string,
+    options: {
+      repo: string,
+      tag: string,
+      comment?: string,
+      author?: string,
+      changes?: string,
+      pause?: boolean
+    }
+  ): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Committing container', { 
+        hostId, 
+        containerId,
+        options 
+      })
+      const container = docker.getContainer(containerId)
+      await container.commit({
+        repo: options.repo,
+        tag: options.tag,
+        comment: options.comment,
+        author: options.author,
+        changes: options.changes,
+        pause: options.pause !== false
+      })
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to commit container', error)
+      throw error
+    }
+  }
+
+  async renameContainer(hostId: string, containerId: string, newName: string): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Renaming container', { 
+        hostId, 
+        containerId, 
+        newName 
+      })
+      const container = docker.getContainer(containerId)
+      await container.rename({ name: newName })
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to rename container', error)
+      throw error
+    }
+  }
+
+  async updateContainer(
+    hostId: string,
+    containerId: string,
+    options: {
+      cpuShares?: number,
+      memory?: number,
+      memoryReservation?: number,
+      memorySwap?: number,
+      cpusetCpus?: string,
+      cpusetMems?: string,
+      restartPolicy?: {
+        Name: string,
+        MaximumRetryCount?: number
+      }
+    }
+  ): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Updating container', { 
+        hostId, 
+        containerId,
+        options 
+      })
+      const container = docker.getContainer(containerId)
+      await container.update(options)
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to update container', error)
+      throw error
+    }
+  }
+
+  // 文件复制接口
+  async copyFromContainer(
+    hostId: string,
+    containerId: string,
+    containerPath: string,
+    hostPath: string
+  ): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Copying from container', { 
+        hostId, 
+        containerId,
+        containerPath,
+        hostPath 
+      })
+      const container = docker.getContainer(containerId)
+      const stream = await container.getArchive({ path: containerPath })
+      await new Promise((resolve, reject) => {
+        const writeStream = require('fs').createWriteStream(hostPath)
+        stream.pipe(writeStream)
+        writeStream.on('finish', resolve)
+        writeStream.on('error', reject)
+      })
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to copy from container', error)
+      throw error
+    }
+  }
+
+  async copyToContainer(
+    hostId: string,
+    containerId: string,
+    hostPath: string,
+    containerPath: string
+  ): Promise<void> {
+    const docker = this.connections.get(hostId)
+    if (!docker) {
+      throw new Error('Docker host not connected')
+    }
+
+    try {
+      this.log(LogLevel.INFO, 'Copying to container', { 
+        hostId, 
+        containerId,
+        hostPath,
+        containerPath 
+      })
+      const container = docker.getContainer(containerId)
+      const tarStream = require('tar').c({
+        gzip: true,
+        file: hostPath
+      })
+      await container.putArchive(tarStream, { path: containerPath })
+    } catch (error) {
+      this.log(LogLevel.ERROR, 'Failed to copy to container', error)
       throw error
     }
   }
