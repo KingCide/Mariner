@@ -155,7 +155,7 @@
 import { ref, reactive } from 'vue'
 import type { VForm } from 'vuetify/components'
 import { useDockerStore } from '../../stores/dockerStore'
-import { DockerService } from '../../services/docker'
+import { DockerService } from '../../services/dockerClient'
 import type { DockerHost } from '../../../types/docker'
 
 const dockerService = new DockerService()

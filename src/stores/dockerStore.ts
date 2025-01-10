@@ -1,6 +1,8 @@
+// 前端数据层，使用 Pinia 实现 Docker 状态管理存储
+// 维护应用状态，封装业务逻辑，错误处理和状态同步，与dockerClient交互
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { DockerService } from '../services/docker'
+import { DockerService } from '../services/dockerClient'
 import type { DockerHost, Container, ImageInfo } from '../../types/docker'
 
 const dockerService = new DockerService()
@@ -375,6 +377,26 @@ export const useDockerStore = defineStore('docker', () => {
     }
   }
 
+  // 批量操作容器
+  const batchOperation = async (
+    hostId: string,
+    containerIds: string[],
+    operation: 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause' | 'remove'
+  ) => {
+    try {
+      loading.value = true
+      error.value = null
+      const result = await dockerService.batchOperation(hostId, containerIds, operation)
+      await refreshContainers() // 刷新容器列表
+      return result
+    } catch (err) {
+      error.value = `批量操作失败: ${(err as Error).message}`
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // 状态
     hosts,
@@ -409,6 +431,7 @@ export const useDockerStore = defineStore('docker', () => {
     exportImage,
     deleteImage,
     setSelectedHost,
+    batchOperation,
   }
   
 }) 

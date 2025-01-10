@@ -1,3 +1,5 @@
+// 前端服务层，暴露给前端的接口，主要负责通过IPC与后端通信，
+// 包装了所有的IPC调用，不包含实际的 Docker操作逻辑。
 import type { DockerHost, Container, ContainerStats, ImageInfo, ContainerListResponse } from '../../types/docker'
 
 const ipc = window.electron.ipcRenderer
@@ -62,5 +64,16 @@ export class DockerService {
 
   async deleteImage(hostId: string, imageId: string) {
     return ipc.invoke('docker:deleteImage', { hostId, imageId })
+  }
+
+  // 批量操作容器
+  async batchOperation(
+    hostId: string,
+    containerIds: string[],
+    operation: 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause' | 'remove'
+  ) {
+    const normalizedContainerIds = Array.from(containerIds)
+    
+    return ipc.invoke('docker:batchOperation', { hostId, containerIds: normalizedContainerIds, operation })
   }
 } 
