@@ -1,3 +1,5 @@
+// TS类型定义文件，定义统一的类型接口
+// 提供类型检查和代码提示，确保前后端数据结构一致性
 export interface DockerHost {
   id: string
   name: string
@@ -136,4 +138,16 @@ export interface ContainerStats {
     read: number
     write: number
   }
+}
+
+// 批量操作类型
+export type BatchOperationType = 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause' | 'remove'
+
+// 批量操作结果
+export interface BatchOperationResult {
+  success: string[]
+  failed: Array<{
+    id: string
+    error: string
+  }>
 } 
