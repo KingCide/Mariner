@@ -20,7 +20,81 @@
         >
           统计信息
         </v-btn>
+        
+        <!-- 批量操作按钮组移到这里 -->
+        <v-btn-group v-if="selected.length > 0" rounded="lg">
+          <v-btn
+            prepend-icon="mdi-play"
+            color="success"
+            variant="tonal"
+            @click="handleBatchOperation('start')"
+            :disabled="!hasStoppedContainers"
+          >
+            启动
+          </v-btn>
+          <v-btn
+            prepend-icon="mdi-stop"
+            color="warning"
+            variant="tonal"
+            @click="handleBatchOperation('stop')"
+            :disabled="!hasRunningContainers"
+          >
+            停止
+          </v-btn>
+          <v-btn
+            prepend-icon="mdi-refresh"
+            color="info"
+            variant="tonal"
+            @click="handleBatchOperation('restart')"
+            :disabled="!hasRunningContainers"
+          >
+            重启
+          </v-btn>
+          <v-menu location="bottom">
+            <template v-slot:activator="{ props }">
+              <v-btn
+                v-bind="props"
+                append-icon="mdi-chevron-down"
+                variant="tonal"
+              >
+                更多操作
+              </v-btn>
+            </template>
+            <v-list>
+              <v-list-item
+                prepend-icon="mdi-flash"
+                @click="handleBatchOperation('kill')"
+                :disabled="!hasRunningContainers"
+              >
+                <v-list-item-title>强制停止</v-list-item-title>
+              </v-list-item>
+              <v-list-item
+                prepend-icon="mdi-pause"
+                @click="handleBatchOperation('pause')"
+                :disabled="!hasRunningContainers"
+              >
+                <v-list-item-title>暂停</v-list-item-title>
+              </v-list-item>
+              <v-list-item
+                prepend-icon="mdi-play-pause"
+                @click="handleBatchOperation('unpause')"
+                :disabled="!hasPausedContainers"
+              >
+                <v-list-item-title>恢复</v-list-item-title>
+              </v-list-item>
+              <v-divider />
+              <v-list-item
+                prepend-icon="mdi-delete"
+                color="error"
+                @click="handleBatchOperation('remove')"
+              >
+                <v-list-item-title>删除</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </v-btn-group>
       </div>
+
       <v-text-field
         v-model="searchText"
         prepend-inner-icon="mdi-magnify"
@@ -98,6 +172,15 @@
         fixed-header
         height="100%"
       >
+        <template v-slot:item.select="{ item }">
+          <v-checkbox
+            v-model="selected"
+            :value="item.id"
+            hide-details
+            density="compact"
+          />
+        </template>
+
         <template v-slot:item.id="{ item }">
           <span class="text-caption text-medium-emphasis">{{ item.id.substring(0, 12) }}</span>
         </template>
@@ -127,79 +210,102 @@
         </template>
 
         <template v-slot:item.actions="{ item }">
-          <v-btn-group density="comfortable">
-            <v-btn
-              v-if="item.status === 'running'"
-              color="warning"
-              icon
-              variant="text"
-              @click="handleStop(item)"
-            >
-              <v-icon>mdi-stop</v-icon>
-            </v-btn>
-            <v-btn
-              v-else
-              color="success"
-              icon
-              variant="text"
-              @click="handleStart(item)"
-            >
-              <v-icon>mdi-play</v-icon>
-            </v-btn>
-            <v-btn
-              color="primary"
-              icon
-              variant="text"
-              @click="handleStats(item)"
-            >
-              <v-icon>mdi-chart-bar</v-icon>
-            </v-btn>
+          <div class="d-flex align-center gap-1 justify-end">
+            <!-- 快捷操作图标 -->
+            <v-tooltip location="top" text="日志">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-text"
+                  size="small"
+                  variant="text"
+                  v-bind="props"
+                  @click="handleLogs(item)"
+                />
+              </template>
+            </v-tooltip>
+
+            <v-tooltip location="top" text="详情">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-information"
+                  size="small"
+                  variant="text"
+                  v-bind="props"
+                  @click="handleInspect(item)"
+                />
+              </template>
+            </v-tooltip>
+
+            <v-tooltip location="top" text="统计">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-chart-bar"
+                  size="small"
+                  variant="text"
+                  v-bind="props"
+                  @click="handleStats(item)"
+                />
+              </template>
+            </v-tooltip>
+
+            <v-tooltip location="top" text="终端">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-console"
+                  size="small"
+                  variant="text"
+                  v-bind="props"
+                  @click="handleTerminal(item)"
+                />
+              </template>
+            </v-tooltip>
+
+            <v-divider vertical class="mx-2" />
+
+            <!-- 更多操作菜单 -->
             <v-menu location="bottom end">
               <template v-slot:activator="{ props }">
                 <v-btn
-                  icon
+                  icon="mdi-dots-vertical"
+                  size="small"
                   variant="text"
                   v-bind="props"
-                >
-                  <v-icon>mdi-dots-vertical</v-icon>
-                </v-btn>
+                />
               </template>
               <v-list>
                 <v-list-item
-                  prepend-icon="mdi-refresh"
-                  @click="handleRestart(item)"
+                  prepend-icon="mdi-export"
+                  @click="handleExport(item)"
                 >
-                  <v-list-item-title>重启</v-list-item-title>
+                  <v-list-item-title>导出容器</v-list-item-title>
                 </v-list-item>
                 <v-list-item
-                  prepend-icon="mdi-text"
-                  @click="handleLogs(item)"
+                  prepend-icon="mdi-content-save"
+                  @click="handleCommit(item)"
                 >
-                  <v-list-item-title>日志</v-list-item-title>
+                  <v-list-item-title>提交为新镜像</v-list-item-title>
                 </v-list-item>
                 <v-list-item
-                  prepend-icon="mdi-information"
-                  @click="handleInspect(item)"
+                  prepend-icon="mdi-rename-box"
+                  @click="handleRename(item)"
                 >
-                  <v-list-item-title>详情</v-list-item-title>
+                  <v-list-item-title>重命名</v-list-item-title>
                 </v-list-item>
                 <v-list-item
-                  prepend-icon="mdi-console"
-                  @click="handleTerminal(item)"
+                  prepend-icon="mdi-cog"
+                  @click="handleUpdate(item)"
                 >
-                  <v-list-item-title>终端</v-list-item-title>
+                  <v-list-item-title>更新配置</v-list-item-title>
                 </v-list-item>
-                <v-divider />
                 <v-list-item
-                  prepend-icon="mdi-delete"
-                  color="error"
-                  @click="handleDelete(item)"
+                  prepend-icon="mdi-file-sync"
+                  @click="handleCopy(item)"
                 >
-                  <v-list-item-title>删除</v-list-item-title>
+                  <v-list-item-title>复制文件</v-list-item-title>
                 </v-list-item>
               </v-list>
             </v-menu>
-          </v-btn-group>
+          </div>
         </template>
       </v-data-table>
     </v-card>
@@ -243,7 +349,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDockerStore } from '../../stores/dockerStore'
-import { DockerService } from '../../services/docker'
+import { DockerService } from '../../services/dockerClient'
 import CreateContainerDialog from '../../components/docker/CreateContainerDialog.vue'
 import ContainerLogsDialog from '../../components/docker/ContainerLogsDialog.vue'
 import ContainerStatsDialog from '../../components/docker/ContainerStatsDialog.vue'
@@ -266,14 +372,64 @@ const searchText = ref('')
 
 // 表格配置
 const headers = [
-  { title: '容器ID', key: 'id', width: 120, align: 'start' },
-  { title: '名称', key: 'name', align: 'start', sortable: true, width: 200 },
-  { title: '镜像', key: 'image', align: 'start', sortable: true, width: 250 },
-  { title: '状态', key: 'status', width: 100, align: 'start' },
-  { title: '端口', key: 'ports', align: 'start', width: 150 },
-  { title: '创建时间', key: 'created', align: 'start', sortable: true, width: 180 },
-  { title: '操作', key: 'actions', align: 'end', sortable: false, width: 150 }
+  { 
+    title: '', 
+    key: 'select',
+    width: 50,
+    sortable: false,
+    align: 'center'
+  },
+  { 
+    title: '容器ID', 
+    key: 'id', 
+    width: 120, 
+    align: 'start' 
+  },
+  { 
+    title: '名称', 
+    key: 'name', 
+    align: 'start', 
+    sortable: true, 
+    width: 200 
+  },
+  { 
+    title: '镜像', 
+    key: 'image', 
+    align: 'start', 
+    sortable: true, 
+    width: 250 
+  },
+  { 
+    title: '状态', 
+    key: 'status', 
+    width: 100, 
+    align: 'start' 
+  },
+  { 
+    title: '端口', 
+    key: 'ports', 
+    align: 'start', 
+    width: 150 
+  },
+  { 
+    title: '创建时间', 
+    key: 'created', 
+    align: 'start', 
+    sortable: true, 
+    width: 180 
+  },
+  { 
+    title: '操作', 
+    key: 'actions', 
+    align: 'end',
+    sortable: false, 
+    width: 200,
+    class: 'text-end'
+  }
 ] as const
+
+// 添加选中容器的状态管理
+const selected = ref<string[]>([])
 
 // 过滤后的容器列表
 const filteredContainers = computed(() => {
@@ -471,6 +627,123 @@ const showStats = ref(localStorage.getItem('showStats') !== 'false')
 watch(showStats, (value) => {
   localStorage.setItem('showStats', value.toString())
 })
+
+// 计算属性：容器状态
+const hasRunningContainers = computed(() => {
+  return selected.value.some(id => {
+    const container = containers.value.find(c => c.id === id)
+    return container?.status === 'running'
+  })
+})
+
+const hasStoppedContainers = computed(() => {
+  return selected.value.some(id => {
+    const container = containers.value.find(c => c.id === id)
+    return container?.status === 'exited'
+  })
+})
+
+const hasPausedContainers = computed(() => {
+  return selected.value.some(id => {
+    const container = containers.value.find(c => c.id === id)
+    return container?.status === 'paused'
+  })
+})
+
+// 批量操作处理方法
+const handleBatchOperation = async (operation: 'start' | 'stop' | 'restart' | 'kill' | 'pause' | 'unpause' | 'remove') => {
+  try {
+    // 确认提示
+    if (operation === 'remove') {
+      const confirm = await new Promise<boolean>((resolve) => {
+        const dialog = window.confirm(`确定要删除选中的 ${selected.value.length} 个容器吗？`)
+        resolve(dialog)
+      })
+      if (!confirm) return
+    }
+
+    // 执行批量操作
+    const result = await dockerStore.batchOperation(hostId.value, selected.value, operation)
+    
+    // 显示结果
+    if (result.success.length > 0) {
+      showMessage(`成功${getOperationName(operation)} ${result.success.length} 个容器`)
+    }
+    if (result.failed.length > 0) {
+      showMessage(`${result.failed.length} 个容器${getOperationName(operation)}失败`, 'error')
+    }
+
+    // 刷新容器列表
+    await loadData()
+    
+    // 如果是删除操作，清空选择
+    if (operation === 'remove') {
+      selected.value = []
+    }
+  } catch (error) {
+    showMessage(`批量操作失败: ${(error as Error).message}`, 'error')
+  }
+}
+
+// 获取操作名称
+const getOperationName = (operation: string): string => {
+  const operationMap: Record<string, string> = {
+    start: '启动',
+    stop: '停止',
+    restart: '重启',
+    kill: '强制停止',
+    pause: '暂停',
+    unpause: '恢复',
+    remove: '删除'
+  }
+  return operationMap[operation] || operation
+}
+
+// 高级操作处理方法
+const handleExport = async (item: any) => {
+  try {
+    // TODO: 实现导出容器功能
+    showMessage('导出容器功能开发中')
+  } catch (error) {
+    showMessage(`导出失败: ${(error as Error).message}`, 'error')
+  }
+}
+
+const handleCommit = async (item: any) => {
+  try {
+    // TODO: 实现提交为新镜像功能
+    showMessage('提交为新镜像功能开发中')
+  } catch (error) {
+    showMessage(`提交失败: ${(error as Error).message}`, 'error')
+  }
+}
+
+const handleRename = async (item: any) => {
+  try {
+    // TODO: 实现重命名功能
+    showMessage('重命名功能开发中')
+  } catch (error) {
+    showMessage(`重命名失败: ${(error as Error).message}`, 'error')
+  }
+}
+
+const handleUpdate = async (item: any) => {
+  try {
+    // TODO: 实现更新配置功能
+    showMessage('更新配置功能开发中')
+  } catch (error) {
+    showMessage(`更新失败: ${(error as Error).message}`, 'error')
+  }
+}
+
+const handleCopy = async (item: any) => {
+  try {
+    // TODO: 实现文件复制功能
+    showMessage('文件复制功能开发中')
+  } catch (error) {
+    showMessage(`复制失败: ${(error as Error).message}`, 'error')
+  }
+}
 </script>
 
 <style scoped>
@@ -598,5 +871,6 @@ watch(showStats, (value) => {
   white-space: normal;
   line-height: 1.2;
   max-width: 400px;
+  min-width: 150px;
 }
 </style> 
